@@ -5,4 +5,6 @@
 
 [NTU RGB+D](https://rose1.ntu.edu.sg/dataset/actionRecognition/)
 
-Ground Truth [Human 3.6M](http://vision.imar.ro/human3.6m/description.php)
+## Ground Truth
+
+[Human 3.6M](http://vision.imar.ro/human3.6m/description.php)
