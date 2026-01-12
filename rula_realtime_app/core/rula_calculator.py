@@ -315,7 +315,7 @@ def rula_score_side(pose, side: str, previous_scores=None):
     return rula
 
 def angle_calc(pose, previous_left=None, previous_right=None):
-    """計算左右手 RULA 分數"""
+    """計算左右側 RULA 分數"""
     try:
         if not pose or len(pose) < 33:
             return ({"score": "NULL"}, {"score": "NULL"})
