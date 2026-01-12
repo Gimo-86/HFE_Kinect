@@ -1,0 +1,25 @@
+[project]
+name = "hfe-kinect"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "gimo-86", email = "gimo9286@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "mediapipe==0.10.14",
+    "numpy>=1.24.0",
+    "opencv-python>=4.8.0",
+    "pykinect-azure>=0.0.4",
+    "pyqt6==6.4.2",
+    "pyqt6-qt6==6.4.3",
+    "pyqt6-sip==13.10.2",
+    "pyqt6-tools==6.4.2.3.3",
+    "setuptools>=80.9.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.24,<0.10.0"]
+build-backend = "uv_build"
