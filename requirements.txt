@@ -1,0 +1,10 @@
+numpy>=1.24.0
+opencv-python>=4.8.0
+pykinect-azure
+PyQt6==6.4.2
+PyQt6-qt6==6.4.3
+PyQt6-sip==13.10.2
+PyQt6-tools==6.4.2.3.3
+setuptools
+matplotlib
+mediapipe==0.10.14
