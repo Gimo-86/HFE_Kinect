@@ -40,8 +40,7 @@ def get_best_rula_score(rula_left, rula_right):
     result = {
         "left": rula_left,
         "right": rula_right,
-        "final_tableC_score": "NULL",
-        "best_risk": "NULL"
+        "final_tableC_score": "NULL"
     }
     
     try:
@@ -51,16 +50,12 @@ def get_best_rula_score(rula_left, rula_right):
         if left_score is not None and right_score is not None:
             if left_score >= right_score:
                 result["final_tableC_score"] = str(left_score)
-                result["best_risk"] = rula_left.get('risk', 'NULL')
             else:
                 result["final_tableC_score"] = str(right_score)
-                result["best_risk"] = rula_right.get('risk', 'NULL')
         elif left_score is not None:
             result["final_tableC_score"] = str(left_score)
-            result["best_risk"] = rula_left.get('risk', 'NULL')
         elif right_score is not None:
             result["final_tableC_score"] = str(right_score)
-            result["best_risk"] = rula_right.get('risk', 'NULL')
     except Exception as e:
         print(f"get_best_rula_score 錯誤: {e}")
     

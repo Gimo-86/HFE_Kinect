@@ -10,8 +10,8 @@ from .video_config import RULA_CONFIG, TOLERANCE_ANGLE, USE_PREVIOUS_FRAME_ON_LO
 
 def rula_risk(point_score, wrist, trunk, upper_Shoulder, lower_Limb, neck,
               wrist_twist, legs, muscle_use_a, muscle_use_b, force_load_a, force_load_b):
-    """依 RULA A/B/C 三表計算總分與風險等級"""
-    rula = {'score': 'NULL', 'risk': 'NULL'}
+    """依 RULA A/B/C 三表計算總分"""
+    rula = {'score': 'NULL'}
     if wrist!=0 and trunk!=0 and upper_Shoulder!=0 and lower_Limb!=0 and neck!=0 and wrist_twist!=0:
         # Table A（上臂/前臂/手腕）
         col_name = f"{wrist}WT{wrist_twist}"
@@ -37,15 +37,7 @@ def rula_risk(point_score, wrist, trunk, upper_Shoulder, lower_Limb, neck,
 
                 if taval in TABLE_C_DATA and tbval in TABLE_C_DATA[taval]:
                     tcval = TABLE_C_DATA[taval][tbval]
-
-                    if tcval in (1, 2):
-                        rula['score'] = str(tcval); rula['risk'] = 'Negligible'
-                    elif tcval in (3, 4):
-                        rula['score'] = str(tcval); rula['risk'] = 'Low risk'
-                    elif tcval in (5, 6):
-                        rula['score'] = str(tcval); rula['risk'] = 'Medium risk'
-                    elif tcval > 6:
-                        rula['score'] = str(tcval); rula['risk'] = 'Very high risk'
+                    rula['score'] = str(tcval)
     return rula, point_score
 # import pprint
 def rula_score_side(pose, side: str, previous_scores=None):
@@ -316,7 +308,7 @@ def rula_score_side(pose, side: str, previous_scores=None):
         rula.update(angle_data)
     except Exception as e:
         print(f"RULA計算錯誤 ({side}): {e}")
-        rula = {'score': '1', 'risk': 'Negligible'}
+        rula = {'score': '1'}
         rula.update(point_score)
         rula.update(angle_data)
 
@@ -326,7 +318,7 @@ def angle_calc(pose, previous_left=None, previous_right=None):
     """計算左右手 RULA 分數"""
     try:
         if not pose or len(pose) < 33:
-            return ({"score": "NULL", "risk": "NULL"}, {"score": "NULL", "risk": "NULL"})
+            return ({"score": "NULL"}, {"score": "NULL"})
 
         rula_left = rula_score_side(pose, 'Left', previous_left)
         rula_right = rula_score_side(pose, 'Right', previous_right)
@@ -334,4 +326,4 @@ def angle_calc(pose, previous_left=None, previous_right=None):
         return (rula_left, rula_right)
     except Exception as e:
         print(f"angle_calc 錯誤: {e}")
-        return ({"score": "NULL", "risk": "NULL"}, {"score": "NULL", "risk": "NULL"})
+        return ({"score": "NULL"}, {"score": "NULL"})

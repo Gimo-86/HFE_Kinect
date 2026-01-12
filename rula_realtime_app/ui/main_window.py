@@ -3,7 +3,7 @@
 """
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QLabel, QGroupBox, QGridLayout)
+                             QPushButton, QLabel, QGroupBox, QGridLayout, QDialog)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 import numpy as np
@@ -11,6 +11,7 @@ import numpy as np
 from core.camera_handler import CameraHandler
 from core.pose_detector import PoseDetector
 from core import angle_calc, get_best_rula_score
+from core.video_config import RULA_CONFIG
 
 
 class MainWindow(QMainWindow):
@@ -36,6 +37,9 @@ class MainWindow(QMainWindow):
         
         # FPS 資訊
         self.current_fps = 0.0
+        
+        # 暫停狀態
+        self.is_paused = False
         
         # 處理計數器（降低 RULA 計算頻率）
         self.frame_counter = 0
@@ -150,6 +154,35 @@ class MainWindow(QMainWindow):
         """)
         button_layout.addWidget(self.stop_button)
         
+        self.pause_button = QPushButton("暫停")
+        self.pause_button.clicked.connect(self.toggle_pause)
+        self.pause_button.setEnabled(False)
+        self.pause_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #f39c12, stop:1 #e67e22);
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #f4a742, stop:1 #f39c12);
+            }
+            QPushButton:pressed {
+                background: #e67e22;
+            }
+            QPushButton:disabled {
+                background: #7f8c8d;
+                color: #bdc3c7;
+            }
+        """)
+        button_layout.addWidget(self.pause_button)
+        
         self.fps_label = QLabel("FPS: 0.0")
         self.fps_label.setStyleSheet("""
             font-size: 16px;
@@ -160,6 +193,33 @@ class MainWindow(QMainWindow):
             color: #3498db;
         """)
         button_layout.addWidget(self.fps_label)
+        
+        # 參數設定按鈕（齒輪圖案）
+        self.config_button = QPushButton("⚙")
+        self.config_button.clicked.connect(self.show_config_dialog)
+        self.config_button.setToolTip("RULA 參數設定")
+        self.config_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #8e44ad, stop:1 #6c3483);
+                color: white;
+                font-size: 24px;
+                font-weight: bold;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 8px;
+                min-width: 50px;
+                max-width: 50px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #9b59b6, stop:1 #8e44ad);
+            }
+            QPushButton:pressed {
+                background: #6c3483;
+            }
+        """)
+        button_layout.addWidget(self.config_button)
         
         button_layout.addStretch()
         left_layout.addLayout(button_layout)
@@ -241,7 +301,9 @@ class MainWindow(QMainWindow):
         ]
         
         group.angle_labels = {}
+        group.part_score_labels = {}
         for key, text in labels_data:
+            # 角度標籤
             label = QLabel(text)
             label.setStyleSheet("font-size: 13px; color: #ffffff;")
             value = QLabel("--")
@@ -249,6 +311,16 @@ class MainWindow(QMainWindow):
             layout.addWidget(label, row, 0)
             layout.addWidget(value, row, 1)
             group.angle_labels[key] = value
+            
+            # 部位分數標籤
+            score_label = QLabel("分數:")
+            score_label.setStyleSheet("font-size: 12px; color: #95a5a6;")
+            score_value = QLabel("--")
+            score_value.setStyleSheet("font-size: 13px; font-weight: bold; color: #f39c12;")
+            layout.addWidget(score_label, row, 2)
+            layout.addWidget(score_value, row, 3)
+            group.part_score_labels[key] = score_value
+            
             row += 1
         
         # 分隔線
@@ -292,15 +364,36 @@ class MainWindow(QMainWindow):
         self.camera_handler.fps_updated.connect(self.on_fps_updated)
         self.camera_handler.start()
         
+        # 重置暫停狀態
+        self.is_paused = False
+        self.pause_button.setText("暫停")
+        
         # 更新按鈕狀態
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
+        self.pause_button.setEnabled(True)
     
     def stop_detection(self):
         """停止辨識"""
         if self.camera_handler:
+            # 斷開所有信號連接
+            try:
+                self.camera_handler.frame_ready.disconnect()
+                self.camera_handler.error_occurred.disconnect()
+                self.camera_handler.fps_updated.disconnect()
+            except:
+                pass  # 如果信號未連接，忽略錯誤
+            
+            # 停止並等待執行緒結束
             self.camera_handler.stop()
             self.camera_handler = None
+        
+        # 重置計數器和暫停狀態
+        self.frame_counter = 0
+        self.prev_left = None
+        self.prev_right = None
+        self.is_paused = False
+        self.pause_button.setText("暫停")
         
         # 重置顯示
         self.video_label.setText("已停止")
@@ -310,6 +403,7 @@ class MainWindow(QMainWindow):
         # 更新按鈕狀態
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
+        self.pause_button.setEnabled(False)
     
     def on_frame_ready(self, frame):
         """
@@ -318,6 +412,10 @@ class MainWindow(QMainWindow):
         Args:
             frame: RGB 格式的影像 (numpy array)
         """
+        # 如果暫停，則不更新顯示
+        if self.is_paused:
+            return
+        
         self.current_frame = frame
         self.frame_counter += 1
         
@@ -364,12 +462,26 @@ class MainWindow(QMainWindow):
             'trunk': 'trunk_angle',
         }
         
+        # 部位分數對應鍵
+        score_keys = {
+            'upper_arm': 'upper_arm_score',
+            'lower_arm': 'lower_arm_score',
+            'wrist': 'wrist_score',
+            'neck': 'neck_score',
+            'trunk': 'trunk_score',
+        }
+        
         for key, data_key in angle_keys.items():
+            # 更新角度
             value = rula_data.get(data_key, 'NULL')
             if value != 'NULL':
                 panel.angle_labels[key].setText(f"{value}°")
             else:
                 panel.angle_labels[key].setText("--")
+            
+            # 更新部位分數
+            score_value = rula_data.get(score_keys[key], '--')
+            panel.part_score_labels[key].setText(str(score_value))
         
         # 更新分數
         table_a = rula_data.get('wrist_and_arm_score', '--')
@@ -402,6 +514,101 @@ class MainWindow(QMainWindow):
         """更新 FPS 顯示"""
         self.current_fps = fps
         self.fps_label.setText(f"FPS: {fps:.1f}")
+    
+    def toggle_pause(self):
+        """切換暫停/繼續"""
+        self.is_paused = not self.is_paused
+        if self.is_paused:
+            self.pause_button.setText("繼續")
+        else:
+            self.pause_button.setText("暫停")
+    
+    def show_config_dialog(self):
+        """顯示參數設定對話框"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("RULA 預設參數設定")
+        dialog.setMinimumSize(400, 350)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #2c3e50;
+                color: #ecf0f1;
+            }
+            QLabel {
+                color: #ecf0f1;
+                font-size: 13px;
+            }
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #3498db, stop:1 #2980b9);
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5dade2, stop:1 #3498db);
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        layout.setSpacing(15)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 標題
+        title_label = QLabel("目前使用的 RULA 固定參數：")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #3498db; margin-bottom: 10px;")
+        layout.addWidget(title_label)
+        
+        # 參數網格
+        grid_layout = QGridLayout()
+        grid_layout.setSpacing(12)
+        
+        params = [
+            ("手腕扭轉 (wrist_twist):", RULA_CONFIG['wrist_twist'], "1=中立位置, 2=扭轉"),
+            ("腿部姿勢 (legs):", RULA_CONFIG['legs'], "1=平衡站立/坐姿, 2=不平衡"),
+            ("肌肉使用-手臂 (muscle_use_a):", RULA_CONFIG['muscle_use_a'], "0=無, 1=靜態/重複"),
+            ("肌肉使用-身體 (muscle_use_b):", RULA_CONFIG['muscle_use_b'], "0=無, 1=靜態/重複"),
+            ("負荷力量-手臂 (force_load_a):", RULA_CONFIG['force_load_a'], "0=<2kg, 1=2-10kg, 2=>10kg"),
+            ("負荷力量-身體 (force_load_b):", RULA_CONFIG['force_load_b'], "0=<2kg, 1=2-10kg, 2=>10kg"),
+        ]
+        
+        row = 0
+        for param_name, param_value, param_desc in params:
+            # 參數名稱
+            name_label = QLabel(param_name)
+            name_label.setStyleSheet("font-weight: bold; color: #ecf0f1;")
+            grid_layout.addWidget(name_label, row, 0)
+            
+            # 參數值
+            value_label = QLabel(str(param_value))
+            value_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #f39c12;")
+            grid_layout.addWidget(value_label, row, 1)
+            row += 1
+            
+            # 參數說明
+            desc_label = QLabel(param_desc)
+            desc_label.setStyleSheet("font-size: 11px; color: #95a5a6; margin-bottom: 8px;")
+            desc_label.setWordWrap(True)
+            grid_layout.addWidget(desc_label, row, 0, 1, 2)
+            row += 1
+        
+        layout.addLayout(grid_layout)
+        layout.addStretch()
+        
+        # 關閉按鈕
+        close_button = QPushButton("關閉")
+        close_button.clicked.connect(dialog.accept)
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(close_button)
+        layout.addLayout(button_layout)
+        
+        dialog.setLayout(layout)
+        dialog.exec()
     
     def closeEvent(self, event):
         """視窗關閉事件"""
