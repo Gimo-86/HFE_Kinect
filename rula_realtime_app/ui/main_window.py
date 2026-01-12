@@ -243,9 +243,9 @@ class MainWindow(QMainWindow):
         group.angle_labels = {}
         for key, text in labels_data:
             label = QLabel(text)
-            label.setStyleSheet("font-size: 13px; color: #95a5a6;")
+            label.setStyleSheet("font-size: 13px; color: #ffffff;")
             value = QLabel("--")
-            value.setStyleSheet("font-size: 14px; font-weight: bold; color: #ecf0f1;")
+            value.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
             layout.addWidget(label, row, 0)
             layout.addWidget(value, row, 1)
             group.angle_labels[key] = value
