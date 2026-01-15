@@ -1,0 +1,6 @@
+{
+    "sdk_path": "C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin",
+    "body_tracking_path": "C:\\Program Files\\Azure Kinect Body Tracking SDK\\tools",
+    "resolution": "1080P",
+    "depth_mode": "WFOV_2x2BINNED"
+}

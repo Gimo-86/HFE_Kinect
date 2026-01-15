@@ -2,15 +2,10 @@ import cv2
 import os
 import numpy as np
 import pykinect_azure as pykinect
+import hardware.config as kinect_config
 
-# 1. 確保 DLL 路徑正確
-SDK_BIN = r"C:\Program Files\Azure Kinect SDK v1.4.1\sdk\windows-desktop\amd64\release\bin"
-BT_BIN = r"C:\Program Files\Azure Kinect Body Tracking SDK\tools"
 
-if os.path.exists(SDK_BIN):
-    os.add_dll_directory(SDK_BIN)
-if os.path.exists(BT_BIN):
-    os.add_dll_directory(BT_BIN)
+kinect_config.load_libraries()
 
 def safe_angle(v1, v2):
     """安全計算兩向量夾角（度）"""
