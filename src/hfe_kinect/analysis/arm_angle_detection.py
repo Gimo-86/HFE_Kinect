@@ -2,9 +2,9 @@ import cv2
 import os
 import numpy as np
 import pykinect_azure as pykinect
-import hardware.config as kinect_config
+import hfe_kinect.hardware.config as kinect_config
 
-
+# Load Kinect SDK and Body Tracking libraries
 kinect_config.load_libraries()
 
 def safe_angle(v1, v2):

@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 
 # Load settings from JSON file
-config_path = Path(__file__).parent / "settings.json"
+config_path = Path(__file__).parents[3] / "config" / "settings.json"
 with open(config_path, "r") as file:
     settings = json.load(file)
 
-# Use the values from JSON
+# Use values from JSON
 SDK_BIN = settings["sdk_path"]
 BT_BIN = settings["body_tracking_path"]
 

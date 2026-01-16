@@ -1,5 +1,5 @@
 [project]
-name = "hfe-kinect"
+name = "hfe_kinect"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"

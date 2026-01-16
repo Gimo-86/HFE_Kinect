@@ -6,17 +6,14 @@ from typing import List, Tuple
 import cv2
 import numpy as np
 import pykinect_azure as pykinect
-import hardware.config as kinect_config
-
-# Ensure repo root on sys.path so rula_realtime_app can be imported when running this file directly.
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.append(str(REPO_ROOT))
+import hfe_kinect.hardware.config as kinect_config
 
 from rula_realtime_app.core.rula_calculator import angle_calc
 from rula_realtime_app.core.utils import get_best_rula_score
 
+#Load Kinect SDK and Body Tracking libraries
 kinect_config.load_libraries()
+
 
 def _joint_to_entry(joint) -> List[float]:
     pos = joint.position.xyz

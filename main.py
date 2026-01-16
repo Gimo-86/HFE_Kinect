@@ -4,79 +4,13 @@ import sys
 from pathlib import Path
 import numpy as np
 import pykinect_azure as pykinect
-
-# 確保可以導入 rula_realtime_app
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.append(str(REPO_ROOT))
+import src.hfe_kinect.hardware.config as kinect_config
+import rula_realtime_app.core.utils as rula_utils
 
 from rula_realtime_app.core.rula_calculator import angle_calc
-from rula_realtime_app.core.utils import get_best_rula_score
-
-# 1. 確保 DLL 路徑正確 (請確認這兩個路徑與您電腦中的實際路徑相符)
-SDK_BIN = r"C:\Program Files\Azure Kinect SDK v1.4.1\sdk\windows-desktop\amd64\release\bin"
-BT_BIN = r"C:\Program Files\Azure Kinect Body Tracking SDK\tools"
-
-if os.path.exists(SDK_BIN):
-    os.add_dll_directory(SDK_BIN)
-if os.path.exists(BT_BIN):
-    os.add_dll_directory(BT_BIN)
 
 
-# Azure Kinect joint indices mapping to MediaPipe-like format
-K4ABT_JOINTS = {
-    "PELVIS": 0,
-    "SPINE_NAVAL": 1,
-    "SPINE_CHEST": 2,
-    "NECK": 3,
-    "CLAVICLE_LEFT": 4,
-    "SHOULDER_LEFT": 5,
-    "ELBOW_LEFT": 6,
-    "WRIST_LEFT": 7,
-    "HAND_LEFT": 8,
-    "HANDTIP_LEFT": 9,
-    "THUMB_LEFT": 10,
-    "CLAVICLE_RIGHT": 11,
-    "SHOULDER_RIGHT": 12,
-    "ELBOW_RIGHT": 13,
-    "WRIST_RIGHT": 14,
-    "HAND_RIGHT": 15,
-    "HANDTIP_RIGHT": 16,
-    "THUMB_RIGHT": 17,
-    "HIP_LEFT": 18,
-    "KNEE_LEFT": 19,
-    "ANKLE_LEFT": 20,
-    "FOOT_LEFT": 21,
-    "HIP_RIGHT": 22,
-    "KNEE_RIGHT": 23,
-    "ANKLE_RIGHT": 24,
-    "FOOT_RIGHT": 25,
-    "HEAD": 26,
-    "NOSE": 27,
-    "EYE_LEFT": 28,
-    "EAR_LEFT": 29,
-    "EYE_RIGHT": 30,
-    "EAR_RIGHT": 31,
-}
-
-# Map Azure Kinect joints to MediaPipe pose indices (33 landmarks)
-KINECT_TO_MEDIAPIPE = {
-    0: K4ABT_JOINTS["NOSE"],          # MediaPipe index 0: NOSE
-    7: K4ABT_JOINTS["EAR_LEFT"],      # MediaPipe index 7: LEFT_EAR
-    8: K4ABT_JOINTS["EAR_RIGHT"],     # MediaPipe index 8: RIGHT_EAR
-    11: K4ABT_JOINTS["SHOULDER_LEFT"], # MediaPipe index 11: LEFT_SHOULDER
-    12: K4ABT_JOINTS["SHOULDER_RIGHT"],# MediaPipe index 12: RIGHT_SHOULDER
-    13: K4ABT_JOINTS["ELBOW_LEFT"],    # MediaPipe index 13: LEFT_ELBOW
-    14: K4ABT_JOINTS["ELBOW_RIGHT"],   # MediaPipe index 14: RIGHT_ELBOW
-    15: K4ABT_JOINTS["WRIST_LEFT"],    # MediaPipe index 15: LEFT_WRIST
-    16: K4ABT_JOINTS["WRIST_RIGHT"],   # MediaPipe index 16: RIGHT_WRIST
-    17: K4ABT_JOINTS["THUMB_LEFT"],    # MediaPipe index 17: LEFT_PINKY (proxy)
-    18: K4ABT_JOINTS["THUMB_RIGHT"],   # MediaPipe index 18: RIGHT_PINKY (proxy)
-    19: K4ABT_JOINTS["HANDTIP_LEFT"],  # MediaPipe index 19: LEFT_INDEX (proxy)
-    20: K4ABT_JOINTS["HANDTIP_RIGHT"], # MediaPipe index 20: RIGHT_INDEX (proxy)
-    23: K4ABT_JOINTS["HIP_LEFT"],      # MediaPipe index 23: LEFT_HIP
-    24: K4ABT_JOINTS["HIP_RIGHT"],     # MediaPipe index 24: RIGHT_HIP
-}
+kinect_config.load_libraries()
 
 
 def skeleton_to_pose_array(skeleton):
@@ -86,7 +20,7 @@ def skeleton_to_pose_array(skeleton):
     """
     pose = [[0.0, 0.0, 0.0, 0.0] for _ in range(33)]
     
-    for mp_idx, kinect_idx in KINECT_TO_MEDIAPIPE.items():
+    for mp_idx, kinect_idx in kinect_config.KINECT_TO_MEDIAPIPE.items():
         joint = skeleton.joints[kinect_idx]
         pos = joint.position.xyz
         # Normalize confidence from Azure Kinect (0-3) to 0-1 range
@@ -215,7 +149,7 @@ if __name__ == "__main__":
             
             # 計算 RULA 分數
             rula_left, rula_right = angle_calc(pose)
-            rula_combined = get_best_rula_score(rula_left, rula_right)
+            rula_combined = rula_utils.get_best_rula_score(rula_left, rula_right)
             
             # 在畫面上繪製 RULA 資訊
             y_offset = draw_rula_info(color_skeleton, i, rula_left, rula_right, rula_combined, y_offset)
