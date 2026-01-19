@@ -7,6 +7,9 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 import numpy as np
+import cv2
+from datetime import datetime
+import os
 
 from core.camera_handler import CameraHandler
 from core.pose_detector import PoseDetector
@@ -197,6 +200,36 @@ class MainWindow(QMainWindow):
             }
         """)
         button_layout.addWidget(self.pause_button)
+        
+        self.save_button = QPushButton("💾 保存")
+        self.save_button.clicked.connect(self.save_snapshot)
+        self.save_button.setEnabled(False)
+        self.save_button.setToolTip("保存當前畫面和分數")
+        self.save_button.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #16a085, stop:1 #138d75);
+                color: white;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 8px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #1abc9c, stop:1 #16a085);
+            }
+            QPushButton:pressed {
+                background: #138d75;
+            }
+            QPushButton:disabled {
+                background: #7f8c8d;
+                color: #bdc3c7;
+            }
+        """)
+        button_layout.addWidget(self.save_button)
         
         self.fps_label = QLabel("FPS: 0.0")
         self.fps_label.setStyleSheet("""
@@ -399,6 +432,7 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.pause_button.setEnabled(True)
+        self.save_button.setEnabled(True)
     
     def stop_detection(self):
         """停止辨識"""
@@ -440,6 +474,7 @@ class MainWindow(QMainWindow):
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self.pause_button.setEnabled(False)
+        self.save_button.setEnabled(False)
     
     def on_frame_ready(self, frame):
         """
@@ -634,6 +669,208 @@ class MainWindow(QMainWindow):
             self.pause_button.setText("繼續")
         else:
             self.pause_button.setText("暫停")
+    
+    def save_snapshot(self):
+        """保存當前畫面和分數"""
+        if self.current_frame is None:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("警告")
+            msg_box.setText("沒有可保存的畫面")
+            msg_box.setStyleSheet("""
+                QMessageBox {
+                    background-color: white;
+                }
+                QLabel {
+                    color: black;
+                    font-size: 12px;
+                    min-width: 200px;
+                }
+                QPushButton {
+                    color: black;
+                    background-color: #e0e0e0;
+                    border: 1px solid #999;
+                    padding: 5px 15px;
+                    min-width: 60px;
+                }
+                QPushButton:hover {
+                    background-color: #d0d0d0;
+                }
+            """)
+            msg_box.exec()
+            return
+        
+        try:
+            # 創建保存目錄
+            save_dir = "rula_snapshots"
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            
+            # 生成文件名（使用時間戳）
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            image_path = os.path.join(save_dir, f"rula_{timestamp}.png")
+            txt_path = os.path.join(save_dir, f"rula_{timestamp}.txt")
+            
+            # 複製當前影像用於保存
+            frame_to_save = self.current_frame.copy()
+            
+            # 在影像上繪製分數資訊
+            self.draw_scores_on_frame(frame_to_save)
+            
+            # 保存影像（OpenCV 使用 BGR 格式）
+            cv2.imwrite(image_path, cv2.cvtColor(frame_to_save, cv2.COLOR_RGB2BGR))
+            
+            # 保存文本資訊
+            self.save_scores_to_text(txt_path)
+            
+            # 顯示成功訊息
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("保存成功")
+            msg_box.setText("文件已成功保存！")
+            msg_box.setInformativeText(f"圖片: {image_path}\n文本: {txt_path}")
+            msg_box.setStyleSheet("""
+                QMessageBox {
+                    background-color: white;
+                }
+                QLabel {
+                    color: black;
+                    font-size: 11px;
+                }
+                QPushButton {
+                    color: black;
+                    background-color: #e0e0e0;
+                    border: 1px solid #999;
+                    padding: 5px 15px;
+                    min-width: 60px;
+                }
+                QPushButton:hover {
+                    background-color: #d0d0d0;
+                }
+            """)
+            msg_box.exec()
+            
+        except Exception as e:
+            msg_box = QMessageBox(self)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("錯誤")
+            msg_box.setText("保存失敗")
+            msg_box.setInformativeText(str(e))
+            msg_box.setStyleSheet("""
+                QMessageBox {
+                    background-color: white;
+                }
+                QLabel {
+                    color: black;
+                    font-size: 12px;
+                    min-width: 200px;
+                }
+                QPushButton {
+                    color: black;
+                    background-color: #e0e0e0;
+                    border: 1px solid #999;
+                    padding: 5px 15px;
+                    min-width: 60px;
+                }
+                QPushButton:hover {
+                    background-color: #d0d0d0;
+                }
+            """)
+            msg_box.exec()
+    
+    def draw_scores_on_frame(self, frame):
+        """在影像上繪製分數資訊"""
+        height, width = frame.shape[:2]
+        
+        # 設置文字參數
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 1.0  # 增大字體
+        thickness = 2
+        line_height = 40  # 增加行高
+        y_start = 50
+        
+        # 計算背景區域大小（正方形區域）
+        bg_width = 550  # 固定寬度
+        bg_height = 180  # 固定高度
+        
+        # 創建半透明背景（正方形區域）
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (15, 15), (15 + bg_width, 15 + bg_height), (44, 62, 80), -1)
+        cv2.addWeighted(overlay, 0.75, frame, 0.25, 0, frame)
+        
+        # 標題
+        cv2.putText(frame, "RULA Evaluation Results", (30, y_start), 
+                   font, 1.1, (52, 152, 219), thickness + 1)
+        
+        # 繪製左側分數
+        y = y_start + line_height + 5
+        cv2.putText(frame, f"Left Side - Score: {self.get_panel_score(self.left_group)}", 
+                   (30, y), font, font_scale, (46, 204, 113), thickness)
+        
+        # 繪製右側分數
+        y += line_height
+        cv2.putText(frame, f"Right Side - Score: {self.get_panel_score(self.right_group)}", 
+                   (30, y), font, font_scale, (46, 204, 113), thickness)
+        
+        # 繪製時間戳
+        y += line_height - 5
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cv2.putText(frame, f"Time: {timestamp}", (30, y), 
+                   font, 0.7, (189, 195, 199), 2)
+    
+    def get_panel_score(self, panel):
+        """從面板獲取總分"""
+        try:
+            score_text = panel.score_labels['table_c'].text()
+            return score_text if score_text != '--' else 'N/A'
+        except:
+            return 'N/A'
+    
+    def save_scores_to_text(self, filepath):
+        """保存分數到文本文件"""
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write("RULA 即時評估結果\n")
+            f.write("=" * 50 + "\n")
+            f.write(f"時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("\n")
+            
+            # 保存左側數據
+            f.write("左側身體評估:\n")
+            f.write("-" * 50 + "\n")
+            self.write_panel_scores(f, self.left_group)
+            f.write("\n")
+            
+            # 保存右側數據
+            f.write("右側身體評估:\n")
+            f.write("-" * 50 + "\n")
+            self.write_panel_scores(f, self.right_group)
+    
+    def write_panel_scores(self, file, panel):
+        """將面板分數寫入文件"""
+        # 寫入角度
+        angle_names = {
+            'upper_arm': '上臂角度',
+            'lower_arm': '前臂角度',
+            'wrist': '手腕角度',
+            'neck': '頸部角度',
+            'trunk': '軀幹角度',
+        }
+        
+        for key, name in angle_names.items():
+            angle = panel.angle_labels[key].text()
+            score = panel.part_score_labels[key].text()
+            file.write(f"  {name}: {angle} (分數: {score})\n")
+        
+        file.write("\n")
+        
+        # 寫入總分
+        table_a = panel.score_labels['table_a'].text()
+        table_b = panel.score_labels['table_b'].text()
+        table_c = panel.score_labels['table_c'].text()
+        
+        file.write(f"  Table A 分數: {table_a}\n")
+        file.write(f"  Table B 分數: {table_b}\n")
+        file.write(f"  Table C 分數 (總分): {table_c}\n")
     
     def show_config_dialog(self):
         """顯示參數設定對話框"""
