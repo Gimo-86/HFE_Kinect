@@ -3,7 +3,7 @@
 """
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QLabel, QGroupBox, QGridLayout, QDialog)
+                             QPushButton, QLabel, QGroupBox, QGridLayout, QDialog, QMessageBox)
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap
 import numpy as np
@@ -11,7 +11,18 @@ import numpy as np
 from core.camera_handler import CameraHandler
 from core.pose_detector import PoseDetector
 from core import angle_calc, get_best_rula_score
-from core.video_config import RULA_CONFIG
+from core.config import RULA_CONFIG, USE_KINECT
+
+# 根據配置選擇性導入 Kinect
+if USE_KINECT:
+    try:
+        from core.kinect_handler import KinectHandler
+        KINECT_AVAILABLE = True
+    except Exception as e:
+        print(f"警告: 無法載入 Kinect 模組: {e}")
+        KINECT_AVAILABLE = False
+else:
+    KINECT_AVAILABLE = False
 
 
 class MainWindow(QMainWindow):
@@ -21,12 +32,16 @@ class MainWindow(QMainWindow):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("RULA 即時評估系統")
+        
+        # 根據配置設定視窗標題
+        source_type = "Azure Kinect" if USE_KINECT else "攝像頭"
+        self.setWindowTitle(f"RULA 即時評估系統 - {source_type}")
         self.setGeometry(100, 100, 1400, 700)  # 加寬視窗
         
         # 核心元件
         self.camera_handler = None
-        self.pose_detector = PoseDetector()
+        self.kinect_handler = None
+        self.pose_detector = None if USE_KINECT else PoseDetector()
         
         # RULA 計算用的前一幀資料
         self.prev_left = None
@@ -357,12 +372,24 @@ class MainWindow(QMainWindow):
     
     def start_detection(self):
         """開始辨識"""
-        # 創建並啟動攝像頭執行緒
-        self.camera_handler = CameraHandler(camera_index=0)
-        self.camera_handler.frame_ready.connect(self.on_frame_ready)
-        self.camera_handler.error_occurred.connect(self.on_error)
-        self.camera_handler.fps_updated.connect(self.on_fps_updated)
-        self.camera_handler.start()
+        if USE_KINECT:
+            # 使用 Azure Kinect
+            if not KINECT_AVAILABLE:
+                self.on_error("Azure Kinect 不可用，請檢查 SDK 安裝")
+                return
+            
+            self.kinect_handler = KinectHandler()
+            self.kinect_handler.frame_ready.connect(self.on_kinect_frame_ready)
+            self.kinect_handler.error_occurred.connect(self.on_error)
+            self.kinect_handler.fps_updated.connect(self.on_fps_updated)
+            self.kinect_handler.start()
+        else:
+            # 使用攝像頭 + MediaPipe
+            self.camera_handler = CameraHandler(camera_index=0)
+            self.camera_handler.frame_ready.connect(self.on_frame_ready)
+            self.camera_handler.error_occurred.connect(self.on_error)
+            self.camera_handler.fps_updated.connect(self.on_fps_updated)
+            self.camera_handler.start()
         
         # 重置暫停狀態
         self.is_paused = False
@@ -375,18 +402,27 @@ class MainWindow(QMainWindow):
     
     def stop_detection(self):
         """停止辨識"""
+        # 停止攝像頭
         if self.camera_handler:
-            # 斷開所有信號連接
             try:
                 self.camera_handler.frame_ready.disconnect()
                 self.camera_handler.error_occurred.disconnect()
                 self.camera_handler.fps_updated.disconnect()
             except:
-                pass  # 如果信號未連接，忽略錯誤
-            
-            # 停止並等待執行緒結束
+                pass
             self.camera_handler.stop()
             self.camera_handler = None
+        
+        # 停止 Kinect
+        if self.kinect_handler:
+            try:
+                self.kinect_handler.frame_ready.disconnect()
+                self.kinect_handler.error_occurred.disconnect()
+                self.kinect_handler.fps_updated.disconnect()
+            except:
+                pass
+            self.kinect_handler.stop()
+            self.kinect_handler = None
         
         # 重置計數器和暫停狀態
         self.frame_counter = 0
@@ -441,6 +477,41 @@ class MainWindow(QMainWindow):
                 self.update_score_panel(self.right_group, rula_right)
         else:
             annotated = frame
+        
+        # 顯示影像
+        self.display_frame(annotated)
+    
+    def on_kinect_frame_ready(self, frame, pose):
+        """
+        處理 Kinect 影像幀和骨架數據
+        
+        Args:
+            frame: RGB 格式的影像 (numpy array，已繪製骨架)
+            pose: 骨架關鍵點列表 (MediaPipe 格式) 或 None
+        """
+        # 如果暫停，則不更新顯示
+        if self.is_paused:
+            return
+        
+        self.current_frame = frame
+        self.frame_counter += 1
+        
+        # Kinect 已經在 frame 上繪製了骨架，直接使用
+        annotated = frame
+        
+        # 如果有骨架數據，進行 RULA 計算
+        if pose is not None:
+            # 只在特定幀才計算 RULA（降低計算負擔）
+            if self.frame_counter % self.rula_calc_every_n_frames == 0:
+                rula_left, rula_right = angle_calc(pose, self.prev_left, self.prev_right)
+                
+                # 儲存為下一幀的參考
+                self.prev_left = rula_left
+                self.prev_right = rula_right
+                
+                # 更新顯示
+                self.update_score_panel(self.left_group, rula_left)
+                self.update_score_panel(self.right_group, rula_right)
         
         # 顯示影像
         self.display_frame(annotated)
@@ -507,7 +578,48 @@ class MainWindow(QMainWindow):
     
     def on_error(self, error_msg):
         """處理錯誤"""
+        # 在視窗上顯示錯誤
         self.video_label.setText(f"錯誤: {error_msg}")
+        
+        # 彈出錯誤對話框
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.setWindowTitle("錯誤")
+        
+        # 設置主要文本
+        if "Kinect" in error_msg or "連接" in error_msg:
+            msg_box.setText("Azure Kinect 連接失敗")
+        else:
+            msg_box.setText("發生錯誤")
+        
+        # 設置詳細信息（不使用 DetailedText 避免出現細節按鈕）
+        msg_box.setInformativeText(error_msg)
+        
+        # 設置樣式以確保文字可見
+        msg_box.setStyleSheet("""
+            QMessageBox {
+                background-color: white;
+            }
+            QLabel {
+                color: black;
+                font-size: 11px;
+            }
+            QPushButton {
+                color: black;
+                background-color: #e0e0e0;
+                border: 1px solid #999;
+                padding: 5px 15px;
+                min-width: 60px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+        """)
+        
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+        
+        # 停止檢測
         self.stop_detection()
     
     def on_fps_updated(self, fps):
@@ -612,7 +724,16 @@ class MainWindow(QMainWindow):
     
     def closeEvent(self, event):
         """視窗關閉事件"""
+        # 停止攝像頭
         if self.camera_handler:
             self.camera_handler.stop()
-        self.pose_detector.close()
+        
+        # 停止 Kinect
+        if self.kinect_handler:
+            self.kinect_handler.stop()
+        
+        # 關閉 MediaPipe pose detector
+        if self.pose_detector:
+            self.pose_detector.close()
+        
         event.accept()

@@ -5,7 +5,18 @@
 
 from .rula_calculator import angle_calc, rula_score_side
 from .utils import get_best_rula_score, safe_angle, check_confidence
-from .video_config import MEDIAPIPE_CONFIG, RULA_CONFIG
+from .config import (
+    MEDIAPIPE_CONFIG, 
+    RULA_CONFIG, 
+    USE_KINECT, 
+    KINECT_TO_MEDIAPIPE, 
+    K4ABT,
+    load_kinect_libraries,
+    KINECT_SDK_PATH,
+    KINECT_BODY_TRACKING_PATH,
+    KINECT_RESOLUTION,
+    KINECT_DEPTH_MODE
+)
 
 __all__ = [
     'angle_calc',
@@ -14,5 +25,13 @@ __all__ = [
     'safe_angle',
     'check_confidence',
     'MEDIAPIPE_CONFIG',
-    'RULA_CONFIG'
+    'RULA_CONFIG',
+    'USE_KINECT',
+    'KINECT_TO_MEDIAPIPE',
+    'K4ABT',
+    'load_kinect_libraries',
+    'KINECT_SDK_PATH',
+    'KINECT_BODY_TRACKING_PATH',
+    'KINECT_RESOLUTION',
+    'KINECT_DEPTH_MODE'
 ]

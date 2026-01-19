@@ -6,6 +6,7 @@ import numpy as np
 import pykinect_azure as pykinect
 import src.hfe_kinect.hardware.config as kinect_config
 import rula_realtime_app.core.utils as rula_utils
+from rula_realtime_app.core.config import KINECT_TO_MEDIAPIPE
 
 from rula_realtime_app.core.rula_calculator import angle_calc
 
@@ -20,7 +21,7 @@ def skeleton_to_pose_array(skeleton):
     """
     pose = [[0.0, 0.0, 0.0, 0.0] for _ in range(33)]
     
-    for mp_idx, kinect_idx in kinect_config.KINECT_TO_MEDIAPIPE.items():
+    for mp_idx, kinect_idx in KINECT_TO_MEDIAPIPE.items():
         joint = skeleton.joints[kinect_idx]
         pos = joint.position.xyz
         # Normalize confidence from Azure Kinect (0-3) to 0-1 range

@@ -8,7 +8,7 @@ import numpy as np
 # 延遲匯入 mediapipe，避免初始化問題
 import mediapipe as mp
 
-from .video_config import MEDIAPIPE_CONFIG
+from .config import MEDIAPIPE_CONFIG
 
 
 class PoseDetector:

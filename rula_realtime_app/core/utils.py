@@ -4,7 +4,7 @@
 """
 
 import numpy as np
-from .video_config import MIN_CONFIDENCE
+from .config import MIN_CONFIDENCE
 
 def safe_unit_vector(v):
     """安全的單位化向量，避免零長度向量"""
