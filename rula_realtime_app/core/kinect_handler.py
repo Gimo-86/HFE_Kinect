@@ -32,7 +32,6 @@ class KinectHandler(QThread):
     # 定義信號
     frame_ready = pyqtSignal(np.ndarray, list)  # 發送影像幀和 pose 數據 (pose array 格式)
     error_occurred = pyqtSignal(str)             # 發送錯誤訊息
-    fps_updated = pyqtSignal(float)              # 發送 FPS 數據
     
     def __init__(self):
         """初始化 Kinect 處理器"""
@@ -44,8 +43,6 @@ class KinectHandler(QThread):
         self.device = None
         self.body_tracker = None
         self.running = False
-        self.fps_counter = 0
-        self.fps_timer = cv2.getTickCount()
         
     def skeleton_to_pose_array(self, skeleton):
         """
@@ -166,17 +163,6 @@ class KinectHandler(QThread):
                 
                 # 發送影像和 pose 數據
                 self.frame_ready.emit(frame_rgb, pose)
-                
-                # 計算 FPS
-                self.fps_counter += 1
-                if self.fps_counter >= 30:
-                    current_time = cv2.getTickCount()
-                    elapsed = (current_time - self.fps_timer) / cv2.getTickFrequency()
-                    fps = self.fps_counter / elapsed
-                    self.fps_updated.emit(fps)
-                    
-                    self.fps_counter = 0
-                    self.fps_timer = current_time
                     
         except Exception as e:
             self.error_occurred.emit(f"Kinect 錯誤: {str(e)}")

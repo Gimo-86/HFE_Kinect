@@ -55,6 +55,8 @@ class MainWindow(QMainWindow):
         
         # FPS 資訊
         self.current_fps = 0.0
+        self.fps_counter = 0
+        self.fps_timer = cv2.getTickCount()
         
         # 暫停狀態
         self.is_paused = False
@@ -414,19 +416,19 @@ class MainWindow(QMainWindow):
             self.kinect_handler = KinectHandler()
             self.kinect_handler.frame_ready.connect(self.on_kinect_frame_ready)
             self.kinect_handler.error_occurred.connect(self.on_error)
-            self.kinect_handler.fps_updated.connect(self.on_fps_updated)
             self.kinect_handler.start()
         else:
             # 使用攝像頭 + MediaPipe
             self.camera_handler = CameraHandler(camera_index=0)
             self.camera_handler.frame_ready.connect(self.on_frame_ready)
             self.camera_handler.error_occurred.connect(self.on_error)
-            self.camera_handler.fps_updated.connect(self.on_fps_updated)
             self.camera_handler.start()
         
-        # 重置暫停狀態
+        # 重置暫停狀態和 FPS 計數器
         self.is_paused = False
         self.pause_button.setText("暫停")
+        self.fps_counter = 0
+        self.fps_timer = cv2.getTickCount()
         
         # 更新按鈕狀態
         self.start_button.setEnabled(False)
@@ -441,7 +443,6 @@ class MainWindow(QMainWindow):
             try:
                 self.camera_handler.frame_ready.disconnect()
                 self.camera_handler.error_occurred.disconnect()
-                self.camera_handler.fps_updated.disconnect()
             except:
                 pass
             self.camera_handler.stop()
@@ -452,7 +453,6 @@ class MainWindow(QMainWindow):
             try:
                 self.kinect_handler.frame_ready.disconnect()
                 self.kinect_handler.error_occurred.disconnect()
-                self.kinect_handler.fps_updated.disconnect()
             except:
                 pass
             self.kinect_handler.stop()
@@ -460,10 +460,15 @@ class MainWindow(QMainWindow):
         
         # 重置計數器和暫停狀態
         self.frame_counter = 0
+        self.fps_counter = 0
         self.prev_left = None
         self.prev_right = None
         self.is_paused = False
         self.pause_button.setText("暫停")
+        
+        # 重置 FPS 顯示
+        self.current_fps = 0.0
+        self.fps_label.setText("FPS: 0.0")
         
         # 重置顯示
         self.video_label.setText("已停止")
@@ -492,6 +497,17 @@ class MainWindow(QMainWindow):
         
         # 每幀都進行骨架辨識（保持骨架顯示流暢）
         detected = self.pose_detector.process_frame(frame)
+        
+        # 計算 FPS（包含骨架偵測時間）
+        self.fps_counter += 1
+        if self.fps_counter >= 30:
+            current_time = cv2.getTickCount()
+            elapsed = (current_time - self.fps_timer) / cv2.getTickFrequency()
+            fps = self.fps_counter / elapsed
+            self.on_fps_updated(fps)
+            
+            self.fps_counter = 0
+            self.fps_timer = current_time
         
         if detected:
             # 繪製骨架（每幀都繪製，不閃爍）
@@ -530,6 +546,17 @@ class MainWindow(QMainWindow):
         
         self.current_frame = frame
         self.frame_counter += 1
+        
+        # 計算 FPS（反映完整的處理速度）
+        self.fps_counter += 1
+        if self.fps_counter >= 30:
+            current_time = cv2.getTickCount()
+            elapsed = (current_time - self.fps_timer) / cv2.getTickFrequency()
+            fps = self.fps_counter / elapsed
+            self.on_fps_updated(fps)
+            
+            self.fps_counter = 0
+            self.fps_timer = current_time
         
         # Kinect 已經在 frame 上繪製了骨架，直接使用
         annotated = frame

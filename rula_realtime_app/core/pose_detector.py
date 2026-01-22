@@ -98,58 +98,6 @@ class PoseDetector:
         
         return annotated_image
     
-    def draw_angles(self, image, rula_data, side='Left'):
-        """
-        在影像上標註關鍵角度
-        
-        Args:
-            image: RGB 格式的影像
-            rula_data: RULA 計算結果字典
-            side: 'Left' 或 'Right'
-            
-        Returns:
-            numpy.ndarray: 標註後的影像
-        """
-        if self.results is None or self.results.pose_landmarks is None:
-            return image
-        
-        annotated_image = image.copy()
-        h, w = image.shape[:2]
-        
-        # 取得關鍵點位置
-        landmarks = self.results.pose_landmarks.landmark
-        
-        # 根據側邊選擇關鍵點
-        if side == 'Left':
-            shoulder_idx = 11  # L_SHOULDER
-            elbow_idx = 13     # L_ELBOW
-            wrist_idx = 15     # L_WRIST
-        else:
-            shoulder_idx = 12  # R_SHOULDER
-            elbow_idx = 14     # R_ELBOW
-            wrist_idx = 16     # R_WRIST
-        
-        # 繪製角度文字
-        def put_angle_text(landmark_idx, text, offset_x=10, offset_y=-10):
-            if landmark_idx < len(landmarks):
-                lm = landmarks[landmark_idx]
-                x = int(lm.x * w) + offset_x
-                y = int(lm.y * h) + offset_y
-                cv2.putText(annotated_image, text, (x, y),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        
-        # 標註各部位角度
-        if 'upper_arm_angle' in rula_data and rula_data['upper_arm_angle'] != 'NULL':
-            put_angle_text(shoulder_idx, f"Arm: {rula_data['upper_arm_angle']}", -60, 0)
-        
-        if 'lower_arm_angle' in rula_data and rula_data['lower_arm_angle'] != 'NULL':
-            put_angle_text(elbow_idx, f"Elbow: {rula_data['lower_arm_angle']}", 10, -10)
-        
-        if 'wrist_angle' in rula_data and rula_data['wrist_angle'] != 'NULL':
-            put_angle_text(wrist_idx, f"Wrist: {rula_data['wrist_angle']}", 10, 10)
-        
-        return annotated_image
-    
     def close(self):
         """釋放資源"""
         if self.pose:

@@ -28,6 +28,5 @@ def main():
     # 執行應用程式
     sys.exit(app.exec())
 
-
 if __name__ == '__main__':
     main()

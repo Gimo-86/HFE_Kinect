@@ -17,7 +17,6 @@ class CameraHandler(QThread):
     # 定義信號
     frame_ready = pyqtSignal(np.ndarray)  # 發送影像幀
     error_occurred = pyqtSignal(str)       # 發送錯誤訊息
-    fps_updated = pyqtSignal(float)        # 發送 FPS 數據
     
     def __init__(self, camera_index=0):
         """
@@ -30,8 +29,6 @@ class CameraHandler(QThread):
         self.camera_index = camera_index
         self.cap = None
         self.running = False
-        self.fps_counter = 0
-        self.fps_timer = cv2.getTickCount()
         
     def run(self):
         """執行緒主循環"""
@@ -64,17 +61,6 @@ class CameraHandler(QThread):
             
             # 發送影像
             self.frame_ready.emit(frame_rgb)
-            
-            # 計算 FPS
-            self.fps_counter += 1
-            if self.fps_counter >= 30:
-                current_time = cv2.getTickCount()
-                elapsed = (current_time - self.fps_timer) / cv2.getTickFrequency()
-                fps = self.fps_counter / elapsed
-                self.fps_updated.emit(fps)
-                
-                self.fps_counter = 0
-                self.fps_timer = current_time
         
         # 釋放資源
         if self.cap is not None:
