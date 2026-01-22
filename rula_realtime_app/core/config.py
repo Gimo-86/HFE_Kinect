@@ -9,7 +9,7 @@ import os
 CAMERA_MODE = "KINECT"  # 可選: "WEBCAM", "KINECT", "KINECT_RGB"
 
 # === 顯示模式選擇 ===
-DISPLAY_MODE = "RULA"  # "RULA": 顯示RULA評估分數; "COORDINATES": 顯示關鍵點坐標
+DISPLAY_MODE = "COORDINATES"  # "RULA": 顯示RULA評估分數; "COORDINATES": 顯示關鍵點坐標
 
 # === Azure Kinect SDK 配置 ===
 # 根據你的安裝路徑修改以下配置

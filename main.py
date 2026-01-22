@@ -3,10 +3,12 @@ import os
 import sys
 from pathlib import Path
 import numpy as np
+import argparse
 import pykinect_azure as pykinect
 import src.hfe_kinect.hardware.config as kinect_config
 import rula_realtime_app.core.utils as rula_utils
 from rula_realtime_app.core.config import KINECT_TO_MEDIAPIPE
+import rula_realtime_app.core.config as app_config
 
 from rula_realtime_app.core.rula_calculator import angle_calc
 
@@ -97,7 +99,49 @@ def draw_rula_info(image, body_id, rula_left, rula_right, rula_combined, y_offse
     return y_offset
 
 
+def draw_coordinates_info(image, body_id, pose, y_offset):
+    """
+    Draw joint coordinates information on the image
+    """
+    # Draw header
+    cv2.putText(image, f"=== Body {body_id} Joint Coordinates ===", 
+                (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+    y_offset += 35
+    
+    # Key joints to display
+    joint_names = [
+        (0, "Nose"), (11, "L Shoulder"), (12, "R Shoulder"),
+        (13, "L Elbow"), (14, "R Elbow"), (15, "L Wrist"), (16, "R Wrist"),
+        (23, "L Hip"), (24, "R Hip")
+    ]
+    
+    for idx, name in joint_names:
+        if idx < len(pose):
+            x, y, z, conf = pose[idx]
+            text = f"{name:12s}: X={x:7.3f} Y={y:7.3f} Z={z:7.3f} (conf={conf:.2f})"
+            color = (0, 255, 0) if conf > 0.7 else (0, 255, 255) if conf > 0.4 else (0, 0, 255)
+            cv2.putText(image, text, (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
+            y_offset += 25
+    
+    y_offset += 10
+    return y_offset
+
+
 if __name__ == "__main__":
+    # 解析命令行參數
+    parser = argparse.ArgumentParser(description='Azure Kinect RULA 分析系統')
+    parser.add_argument(
+        '--display-mode',
+        type=str,
+        choices=['RULA', 'COORDINATES'],
+        default=app_config.DISPLAY_MODE,
+        help='顯示模式: RULA (顯示RULA評估分數) 或 COORDINATES (顯示關鍵點坐標)'
+    )
+    args = parser.parse_args()
+    
+    # 更新配置
+    display_mode = args.display_mode
+    print(f"啟動設定: 顯示模式={display_mode}")
 
     # 2. 初始化庫 (track_body 必須為 True 以啟動骨架偵測功能)
     pykinect.initialize_libraries(track_body=True)
@@ -116,8 +160,9 @@ if __name__ == "__main__":
     # 在新版 API 中，直接呼叫 start_body_tracker 即可，它會自動載入最佳配置
     bodyTracker = pykinect.start_body_tracker()
 
-    cv2.namedWindow('RULA Skeleton Analysis', cv2.WINDOW_NORMAL)
-    print("Azure Kinect RULA 分析啟動中... 按下 'q' 鍵可退出程式")
+    window_title = f'Kinect Analysis - {display_mode} Mode'
+    cv2.namedWindow(window_title, cv2.WINDOW_NORMAL)
+    print(f"Azure Kinect {display_mode} 分析啟動中... 按下 'q' 鍵可退出程式")
     print("=" * 60)
 
     while True:
@@ -148,36 +193,53 @@ if __name__ == "__main__":
             # 轉換為 MediaPipe 格式的 pose array
             pose = skeleton_to_pose_array(skeleton)
             
-            # 計算 RULA 分數
-            rula_left, rula_right = angle_calc(pose)
-            rula_combined = rula_utils.get_best_rula_score(rula_left, rula_right)
+            if display_mode == "RULA":
+                # 計算 RULA 分數
+                rula_left, rula_right = angle_calc(pose)
+                rula_combined = rula_utils.get_best_rula_score(rula_left, rula_right)
+                
+                # 在畫面上繪製 RULA 資訊
+                y_offset = draw_rula_info(color_skeleton, i, rula_left, rula_right, rula_combined, y_offset)
+                
+                # 在控制台輸出詳細資訊
+                print(f"\n[Body {i}]")
+                print(f"  Left  - Score: {rula_left.get('score', 'NULL'):>4} | "
+                      f"Upper Arm: {str(rula_left.get('upper_arm_angle', 'NULL')):>6} | "
+                      f"Wrist: {str(rula_left.get('wrist_angle', 'NULL')):>6}")
+                print(f"  Right - Score: {rula_right.get('score', 'NULL'):>4} | "
+                      f"Upper Arm: {str(rula_right.get('upper_arm_angle', 'NULL')):>6} | "
+                      f"Wrist: {str(rula_right.get('wrist_angle', 'NULL')):>6}")
+                print(f"  Posture - Neck: {str(rula_left.get('neck_angle', 'NULL')):>6} | "
+                      f"Trunk: {str(rula_left.get('trunk_angle', 'NULL')):>6}")
+                print(f"  *** FINAL RULA: {rula_combined.get('final_tableC_score', 'NULL')} ***")
             
-            # 在畫面上繪製 RULA 資訊
-            y_offset = draw_rula_info(color_skeleton, i, rula_left, rula_right, rula_combined, y_offset)
-            
-            # 在控制台輸出詳細資訊
-            print(f"\n[Body {i}]")
-            print(f"  Left  - Score: {rula_left.get('score', 'NULL'):>4} | "
-                  f"Upper Arm: {str(rula_left.get('upper_arm_angle', 'NULL')):>6} | "
-                  f"Wrist: {str(rula_left.get('wrist_angle', 'NULL')):>6}")
-            print(f"  Right - Score: {rula_right.get('score', 'NULL'):>4} | "
-                  f"Upper Arm: {str(rula_right.get('upper_arm_angle', 'NULL')):>6} | "
-                  f"Wrist: {str(rula_right.get('wrist_angle', 'NULL')):>6}")
-            print(f"  Posture - Neck: {str(rula_left.get('neck_angle', 'NULL')):>6} | "
-                  f"Trunk: {str(rula_left.get('trunk_angle', 'NULL')):>6}")
-            print(f"  *** FINAL RULA: {rula_combined.get('final_tableC_score', 'NULL')} ***")
+            elif display_mode == "COORDINATES":
+                # 在畫面上繪製關鍵點坐標資訊
+                y_offset = draw_coordinates_info(color_skeleton, i, pose, y_offset)
+                
+                # 在控制台輸出關鍵點坐標
+                print(f"\n[Body {i} - Coordinates]")
+                print(f"  Nose: X={pose[0][0]:.3f}, Y={pose[0][1]:.3f}, Z={pose[0][2]:.3f}")
+                print(f"  L Shoulder: X={pose[11][0]:.3f}, Y={pose[11][1]:.3f}, Z={pose[11][2]:.3f}")
+                print(f"  R Shoulder: X={pose[12][0]:.3f}, Y={pose[12][1]:.3f}, Z={pose[12][2]:.3f}")
 
         # 顯示說明
         legend_y = color_skeleton.shape[0] - 100
-        cv2.putText(color_skeleton, "RULA Score Guide:", (10, legend_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(color_skeleton, "1-2: Acceptable | 3-4: Investigate", (10, legend_y + 25), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        cv2.putText(color_skeleton, "5-6: Change Soon | 7+: Change Immediately", (10, legend_y + 50), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        if display_mode == "RULA":
+            cv2.putText(color_skeleton, "RULA Score Guide:", (10, legend_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(color_skeleton, "1-2: Acceptable | 3-4: Investigate", (10, legend_y + 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            cv2.putText(color_skeleton, "5-6: Change Soon | 7+: Change Immediately", (10, legend_y + 50), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        else:
+            cv2.putText(color_skeleton, "Coordinate Display Mode", (10, legend_y), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            cv2.putText(color_skeleton, "Green: High confidence | Yellow: Medium | Red: Low", (10, legend_y + 25), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         # 顯示結果
-        cv2.imshow('RULA Skeleton Analysis', color_skeleton)    
+        cv2.imshow(window_title, color_skeleton)    
 
         # 按下 q 鍵停止
         if cv2.waitKey(1) == ord('q'):  

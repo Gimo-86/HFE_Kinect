@@ -14,28 +14,22 @@ import os
 from core.camera_handler import CameraHandler
 from core.pose_detector import PoseDetector
 from core import angle_calc, get_best_rula_score
-from core.config import RULA_CONFIG, CAMERA_MODE, DISPLAY_MODE
+from core import config as core_config
+from core.config import RULA_CONFIG
 
-# 根據配置選擇性導入 Kinect
-if CAMERA_MODE == "KINECT":
-    try:
-        from core.kinect_handler import KinectHandler
-        KINECT_AVAILABLE = True
-    except Exception as e:
-        print(f"警告: 無法載入 Kinect 模組: {e}")
-        KINECT_AVAILABLE = False
-else:
+# 嘗試導入所有可能的相機模組（動態判斷）
+try:
+    from core.kinect_handler import KinectHandler
+    KINECT_AVAILABLE = True
+except Exception as e:
+    print(f"警告: 無法載入 Kinect 模組: {e}")
     KINECT_AVAILABLE = False
 
-# 根據配置選擇性導入 Kinect RGB
-if CAMERA_MODE == "KINECT_RGB":
-    try:
-        from core.kinect_rgb_handler import KinectRGBHandler
-        KINECT_RGB_AVAILABLE = True
-    except Exception as e:
-        print(f"警告: 無法載入 Kinect RGB 模組: {e}")
-        KINECT_RGB_AVAILABLE = False
-else:
+try:
+    from core.kinect_rgb_handler import KinectRGBHandler
+    KINECT_RGB_AVAILABLE = True
+except Exception as e:
+    print(f"警告: 無法載入 Kinect RGB 模組: {e}")
     KINECT_RGB_AVAILABLE = False
 
 
@@ -47,13 +41,16 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
+        # 從 config 動態讀取相機模式
+        self.camera_mode = core_config.CAMERA_MODE
+        
         # 根據配置設定視窗標題
         source_types = {
             "WEBCAM": "攝像頭",
             "KINECT": "Azure Kinect",
             "KINECT_RGB": "Kinect RGB + MediaPipe"
         }
-        source_type = source_types.get(CAMERA_MODE, "攝像頭")
+        source_type = source_types.get(self.camera_mode, "攝像頭")
         self.setWindowTitle(f"RULA 即時評估系統 - {source_type}")
         self.setGeometry(100, 100, 1400, 700)  # 加寬視窗
         
@@ -62,7 +59,7 @@ class MainWindow(QMainWindow):
         self.kinect_handler = None
         self.kinect_rgb_handler = None
         # 只有非 Kinect Body Tracking 模式才需要 MediaPipe
-        self.pose_detector = None if CAMERA_MODE == "KINECT" else PoseDetector()
+        self.pose_detector = None if self.camera_mode == "KINECT" else PoseDetector()
         
         # RULA 計算用的前一幀資料
         self.prev_left = None
@@ -86,8 +83,8 @@ class MainWindow(QMainWindow):
         # 最後的骨架繪製結果（用於未處理的幀）
         self.last_annotated_frame = None
         
-        # 顯示模式
-        self.display_mode = DISPLAY_MODE  # "RULA" 或 "COORDINATES"
+        # 顯示模式 - 從 config 模組動態讀取
+        self.display_mode = core_config.DISPLAY_MODE  # "RULA" 或 "COORDINATES"
         
         # 初始化 UI
         self.init_ui()
@@ -493,7 +490,7 @@ class MainWindow(QMainWindow):
     
     def start_detection(self):
         """開始辨識"""
-        if CAMERA_MODE == "KINECT":
+        if self.camera_mode == "KINECT":
             # 使用 Azure Kinect（含 Body Tracking）
             if not KINECT_AVAILABLE:
                 self.on_error("Azure Kinect 不可用，請檢查 SDK 安裝")
@@ -503,7 +500,7 @@ class MainWindow(QMainWindow):
             self.kinect_handler.frame_ready.connect(self.on_kinect_frame_ready)
             self.kinect_handler.error_occurred.connect(self.on_error)
             self.kinect_handler.start()
-        elif CAMERA_MODE == "KINECT_RGB":
+        elif self.camera_mode == "KINECT_RGB":
             # 使用 Kinect RGB 相機 + MediaPipe
             if not KINECT_RGB_AVAILABLE:
                 self.on_error("Kinect RGB 不可用，請檢查 SDK 安裝")
@@ -513,7 +510,7 @@ class MainWindow(QMainWindow):
             self.kinect_rgb_handler.frame_ready.connect(self.on_frame_ready)
             self.kinect_rgb_handler.error_occurred.connect(self.on_error)
             self.kinect_rgb_handler.start()
-        else:  # CAMERA_MODE == "WEBCAM"
+        else:  # self.camera_mode == "WEBCAM"
             # 使用攝像頭 + MediaPipe
             self.camera_handler = CameraHandler(camera_index=0)
             self.camera_handler.frame_ready.connect(self.on_frame_ready)
