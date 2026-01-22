@@ -8,7 +8,7 @@ from .utils import get_best_rula_score, safe_angle, check_confidence
 from .config import (
     MEDIAPIPE_CONFIG, 
     RULA_CONFIG, 
-    USE_KINECT, 
+    CAMERA_MODE, 
     KINECT_TO_MEDIAPIPE, 
     K4ABT,
     load_kinect_libraries,
@@ -26,7 +26,7 @@ __all__ = [
     'check_confidence',
     'MEDIAPIPE_CONFIG',
     'RULA_CONFIG',
-    'USE_KINECT',
+    'CAMERA_MODE',
     'KINECT_TO_MEDIAPIPE',
     'K4ABT',
     'load_kinect_libraries',

@@ -5,7 +5,11 @@
 import os
 
 # === 數據源選擇 ===
-USE_KINECT = True  # True: 使用 Azure Kinect; False: 使用 MediaPipe (攝像頭)
+# 相機模式："WEBCAM" (普通攝像頭), "KINECT" (Kinect + Body Tracking), "KINECT_RGB" (Kinect RGB + MediaPipe)
+CAMERA_MODE = "KINECT"  # 可選: "WEBCAM", "KINECT", "KINECT_RGB"
+
+# === 顯示模式選擇 ===
+DISPLAY_MODE = "RULA"  # "RULA": 顯示RULA評估分數; "COORDINATES": 顯示關鍵點坐標
 
 # === Azure Kinect SDK 配置 ===
 # 根據你的安裝路徑修改以下配置

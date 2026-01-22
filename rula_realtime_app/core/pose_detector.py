@@ -57,17 +57,17 @@ class PoseDetector:
     
     def get_landmarks_array(self):
         """
-        取得關鍵點陣列（用於 RULA 計算）
+        取得關鍵點陣列（用於 RULA 計算）- 使用世界坐標
         
         Returns:
-            list: 33個關鍵點的 [x, y, z, visibility] 列表
+            list: 33個關鍵點的 [x, y, z, visibility] 列表（米為單位的世界坐標）
                   若無偵測結果則返回 None
         """
-        if self.results is None or self.results.pose_landmarks is None:
+        if self.results is None or self.results.pose_world_landmarks is None:
             return None
         
         landmarks = []
-        for lm in self.results.pose_landmarks.landmark:
+        for lm in self.results.pose_world_landmarks.landmark:
             landmarks.append([lm.x, lm.y, lm.z, lm.visibility])
         
         return landmarks

@@ -14,10 +14,10 @@ import os
 from core.camera_handler import CameraHandler
 from core.pose_detector import PoseDetector
 from core import angle_calc, get_best_rula_score
-from core.config import RULA_CONFIG, USE_KINECT
+from core.config import RULA_CONFIG, CAMERA_MODE, DISPLAY_MODE
 
 # 根據配置選擇性導入 Kinect
-if USE_KINECT:
+if CAMERA_MODE == "KINECT":
     try:
         from core.kinect_handler import KinectHandler
         KINECT_AVAILABLE = True
@@ -26,6 +26,17 @@ if USE_KINECT:
         KINECT_AVAILABLE = False
 else:
     KINECT_AVAILABLE = False
+
+# 根據配置選擇性導入 Kinect RGB
+if CAMERA_MODE == "KINECT_RGB":
+    try:
+        from core.kinect_rgb_handler import KinectRGBHandler
+        KINECT_RGB_AVAILABLE = True
+    except Exception as e:
+        print(f"警告: 無法載入 Kinect RGB 模組: {e}")
+        KINECT_RGB_AVAILABLE = False
+else:
+    KINECT_RGB_AVAILABLE = False
 
 
 class MainWindow(QMainWindow):
@@ -37,14 +48,21 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         # 根據配置設定視窗標題
-        source_type = "Azure Kinect" if USE_KINECT else "攝像頭"
+        source_types = {
+            "WEBCAM": "攝像頭",
+            "KINECT": "Azure Kinect",
+            "KINECT_RGB": "Kinect RGB + MediaPipe"
+        }
+        source_type = source_types.get(CAMERA_MODE, "攝像頭")
         self.setWindowTitle(f"RULA 即時評估系統 - {source_type}")
         self.setGeometry(100, 100, 1400, 700)  # 加寬視窗
         
         # 核心元件
         self.camera_handler = None
         self.kinect_handler = None
-        self.pose_detector = None if USE_KINECT else PoseDetector()
+        self.kinect_rgb_handler = None
+        # 只有非 Kinect Body Tracking 模式才需要 MediaPipe
+        self.pose_detector = None if CAMERA_MODE == "KINECT" else PoseDetector()
         
         # RULA 計算用的前一幀資料
         self.prev_left = None
@@ -67,6 +85,9 @@ class MainWindow(QMainWindow):
         
         # 最後的骨架繪製結果（用於未處理的幀）
         self.last_annotated_frame = None
+        
+        # 顯示模式
+        self.display_mode = DISPLAY_MODE  # "RULA" 或 "COORDINATES"
         
         # 初始化 UI
         self.init_ui()
@@ -286,15 +307,20 @@ class MainWindow(QMainWindow):
         right_widget.setMaximumWidth(500)  # 限制最大寬度避免過寬
         right_widget.setLayout(right_layout)
         
-        # 左側身體評估
-        self.left_group = self.create_score_panel("左側 RULA 評估")
-        self.left_group.setMinimumHeight(280)  # 確保足夠高度
-        right_layout.addWidget(self.left_group)
-        
-        # 右側身體評估
-        self.right_group = self.create_score_panel("右側 RULA 評估")
-        self.right_group.setMinimumHeight(280)  # 確保足夠高度
-        right_layout.addWidget(self.right_group)
+        # 根據顯示模式創建不同的面板
+        if self.display_mode == "RULA":
+            # RULA 評估模式
+            self.left_group = self.create_score_panel("左側 RULA 評估")
+            self.left_group.setMinimumHeight(280)
+            right_layout.addWidget(self.left_group)
+            
+            self.right_group = self.create_score_panel("右側 RULA 評估")
+            self.right_group.setMinimumHeight(280)
+            right_layout.addWidget(self.right_group)
+        else:
+            # 坐標顯示模式
+            self.coordinates_group = self.create_coordinates_panel("關鍵點坐標")
+            right_layout.addWidget(self.coordinates_group)
         
         right_layout.addStretch()
         
@@ -405,10 +431,70 @@ class MainWindow(QMainWindow):
         group.setLayout(layout)
         return group
     
+    def create_coordinates_panel(self, title):
+        """
+        創建坐標顯示面板
+        
+        Args:
+            title: 面板標題
+            
+        Returns:
+            QGroupBox: 坐標顯示面板
+        """
+        from PyQt6.QtWidgets import QScrollArea, QTextEdit
+        
+        group = QGroupBox(title)
+        group.setStyleSheet("""
+            QGroupBox {
+                font-size: 16px;
+                font-weight: bold;
+                color: #3498db;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(44, 62, 80, 0.95), stop:1 rgba(52, 73, 94, 0.95));
+                border: 2px solid #3498db;
+                border-radius: 12px;
+                margin-top: 15px;
+                padding: 20px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 15px;
+                padding: 5px 15px;
+                background-color: #2c3e50;
+                border-radius: 6px;
+            }
+            QTextEdit {
+                background-color: rgba(26, 26, 26, 0.8);
+                color: #ecf0f1;
+                border: 1px solid #34495e;
+                border-radius: 5px;
+                font-family: "Courier New", monospace;
+                font-size: 11px;
+                padding: 5px;
+            }
+        """)
+        
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        # 使用 QTextEdit 顯示坐標信息
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setMinimumHeight(600)
+        text_edit.setText("等待骨架數據...")
+        
+        layout.addWidget(text_edit)
+        group.setLayout(layout)
+        
+        # 保存 text_edit 引用以便後續更新
+        group.text_edit = text_edit
+        
+        return group
+    
     def start_detection(self):
         """開始辨識"""
-        if USE_KINECT:
-            # 使用 Azure Kinect
+        if CAMERA_MODE == "KINECT":
+            # 使用 Azure Kinect（含 Body Tracking）
             if not KINECT_AVAILABLE:
                 self.on_error("Azure Kinect 不可用，請檢查 SDK 安裝")
                 return
@@ -417,7 +503,17 @@ class MainWindow(QMainWindow):
             self.kinect_handler.frame_ready.connect(self.on_kinect_frame_ready)
             self.kinect_handler.error_occurred.connect(self.on_error)
             self.kinect_handler.start()
-        else:
+        elif CAMERA_MODE == "KINECT_RGB":
+            # 使用 Kinect RGB 相機 + MediaPipe
+            if not KINECT_RGB_AVAILABLE:
+                self.on_error("Kinect RGB 不可用，請檢查 SDK 安裝")
+                return
+            
+            self.kinect_rgb_handler = KinectRGBHandler()
+            self.kinect_rgb_handler.frame_ready.connect(self.on_frame_ready)
+            self.kinect_rgb_handler.error_occurred.connect(self.on_error)
+            self.kinect_rgb_handler.start()
+        else:  # CAMERA_MODE == "WEBCAM"
             # 使用攝像頭 + MediaPipe
             self.camera_handler = CameraHandler(camera_index=0)
             self.camera_handler.frame_ready.connect(self.on_frame_ready)
@@ -458,6 +554,16 @@ class MainWindow(QMainWindow):
             self.kinect_handler.stop()
             self.kinect_handler = None
         
+        # 停止 Kinect RGB
+        if self.kinect_rgb_handler:
+            try:
+                self.kinect_rgb_handler.frame_ready.disconnect()
+                self.kinect_rgb_handler.error_occurred.disconnect()
+            except:
+                pass
+            self.kinect_rgb_handler.stop()
+            self.kinect_rgb_handler = None
+        
         # 重置計數器和暫停狀態
         self.frame_counter = 0
         self.fps_counter = 0
@@ -472,8 +578,13 @@ class MainWindow(QMainWindow):
         
         # 重置顯示
         self.video_label.setText("已停止")
-        self.update_score_panel(self.left_group, {})
-        self.update_score_panel(self.right_group, {})
+        
+        # 根據顯示模式重置面板
+        if self.display_mode == "RULA":
+            self.update_score_panel(self.left_group, {})
+            self.update_score_panel(self.right_group, {})
+        else:
+            self.coordinates_group.text_edit.setPlainText("等待骨架數據...")
         
         # 更新按鈕狀態
         self.start_button.setEnabled(True)
@@ -492,7 +603,6 @@ class MainWindow(QMainWindow):
         if self.is_paused:
             return
         
-        self.current_frame = frame
         self.frame_counter += 1
         
         # 每幀都進行骨架辨識（保持骨架顯示流暢）
@@ -513,21 +623,31 @@ class MainWindow(QMainWindow):
             # 繪製骨架（每幀都繪製，不閃爍）
             annotated = self.pose_detector.draw_landmarks(frame)
             
-            # 只在特定幀才計算 RULA（降低計算負擔）
-            if self.frame_counter % self.rula_calc_every_n_frames == 0:
-                # 取得關鍵點並計算 RULA
+            # 根據顯示模式更新面板
+            if self.display_mode == "RULA":
+                # 只在特定幀才計算 RULA（降低計算負擔）
+                if self.frame_counter % self.rula_calc_every_n_frames == 0:
+                    # 取得關鍵點並計算 RULA
+                    landmarks = self.pose_detector.get_landmarks_array()
+                    rula_left, rula_right = angle_calc(landmarks, self.prev_left, self.prev_right)
+                    
+                    # 儲存為下一幀的參考
+                    self.prev_left = rula_left
+                    self.prev_right = rula_right
+                    
+                    # 更新顯示
+                    self.update_score_panel(self.left_group, rula_left)
+                    self.update_score_panel(self.right_group, rula_right)
+            else:
+                # 坐標顯示模式 - 每幀更新
                 landmarks = self.pose_detector.get_landmarks_array()
-                rula_left, rula_right = angle_calc(landmarks, self.prev_left, self.prev_right)
-                
-                # 儲存為下一幀的參考
-                self.prev_left = rula_left
-                self.prev_right = rula_right
-                
-                # 更新顯示
-                self.update_score_panel(self.left_group, rula_left)
-                self.update_score_panel(self.right_group, rula_right)
+                if landmarks:
+                    self.update_coordinates_panel(landmarks)
         else:
             annotated = frame
+        
+        # 保存繪製骨架後的影像（用於保存功能）
+        self.current_frame = annotated
         
         # 顯示影像
         self.display_frame(annotated)
@@ -561,19 +681,24 @@ class MainWindow(QMainWindow):
         # Kinect 已經在 frame 上繪製了骨架，直接使用
         annotated = frame
         
-        # 如果有骨架數據，進行 RULA 計算
-        if pose is not None:
-            # 只在特定幀才計算 RULA（降低計算負擔）
-            if self.frame_counter % self.rula_calc_every_n_frames == 0:
-                rula_left, rula_right = angle_calc(pose, self.prev_left, self.prev_right)
-                
-                # 儲存為下一幀的參考
-                self.prev_left = rula_left
-                self.prev_right = rula_right
-                
-                # 更新顯示
-                self.update_score_panel(self.left_group, rula_left)
-                self.update_score_panel(self.right_group, rula_right)
+        # 如果有骨架數據，進行 RULA 計算（檢查 pose 列表是否非空）
+        if pose:
+            # 根據顯示模式更新面板
+            if self.display_mode == "RULA":
+                # 只在特定幀才計算 RULA（降低計算負擔）
+                if self.frame_counter % self.rula_calc_every_n_frames == 0:
+                    rula_left, rula_right = angle_calc(pose, self.prev_left, self.prev_right)
+                    
+                    # 儲存為下一幀的參考
+                    self.prev_left = rula_left
+                    self.prev_right = rula_right
+                    
+                    # 更新顯示
+                    self.update_score_panel(self.left_group, rula_left)
+                    self.update_score_panel(self.right_group, rula_right)
+            else:
+                # 坐標顯示模式 - 每幀更新
+                self.update_coordinates_panel(pose)
         
         # 顯示影像
         self.display_frame(annotated)
@@ -624,6 +749,43 @@ class MainWindow(QMainWindow):
         panel.score_labels['table_a'].setText(str(table_a))
         panel.score_labels['table_b'].setText(str(table_b))
         panel.score_labels['table_c'].setText(str(table_c))
+    
+    def update_coordinates_panel(self, landmarks):
+        """
+        更新坐標顯示面板 - 只顯示用於 RULA 角度計算的關鍵點
+        
+        Args:
+            landmarks: 骨架關鍵點列表 [[x, y, z, visibility], ...]
+        """
+        # 只顯示用於 RULA 計算的關鍵點
+        key_points = {
+            0: "Nose",
+            11: "Left Shoulder",
+            12: "Right Shoulder",
+            13: "Left Elbow",
+            14: "Right Elbow",
+            15: "Left Wrist",
+            16: "Right Wrist",
+            23: "Left Hip",
+            24: "Right Hip",
+        }
+        
+        # 構建顯示文本
+        text_lines = []
+        
+        for idx, name in key_points.items():
+            if idx < len(landmarks):
+                lm = landmarks[idx]
+                x, y, z, vis = lm[0], lm[1], lm[2], lm[3]
+                text_lines.append(f"【{idx:2d}】 {name:20s}")
+                text_lines.append(f"      X: {x:7.4f}  Y: {y:7.4f}  Z: {z:7.4f}")
+                text_lines.append(f"      Visibility: {vis:.4f}")
+                text_lines.append("")
+        
+        display_text = "\n".join(text_lines)
+        
+        # 更新 QTextEdit
+        self.coordinates_group.text_edit.setPlainText(display_text)
     
     def display_frame(self, frame):
         """
@@ -735,27 +897,44 @@ class MainWindow(QMainWindow):
             
             # 生成文件名（使用時間戳）
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            image_path = os.path.join(save_dir, f"rula_{timestamp}.png")
-            txt_path = os.path.join(save_dir, f"rula_{timestamp}.txt")
             
             # 複製當前影像用於保存
             frame_to_save = self.current_frame.copy()
             
-            # 在影像上繪製分數資訊
-            self.draw_scores_on_frame(frame_to_save)
-            
-            # 保存影像（OpenCV 使用 BGR 格式）
-            cv2.imwrite(image_path, cv2.cvtColor(frame_to_save, cv2.COLOR_RGB2BGR))
-            
-            # 保存文本資訊
-            self.save_scores_to_text(txt_path)
+            # 根據顯示模式處理保存
+            if self.display_mode == "RULA":
+                image_path = os.path.join(save_dir, f"rula_{timestamp}.png")
+                txt_path = os.path.join(save_dir, f"rula_{timestamp}.txt")
+                
+                # 在影像上繪製分數資訊
+                self.draw_scores_on_frame(frame_to_save)
+                
+                # 保存影像（OpenCV 使用 BGR 格式）
+                cv2.imwrite(image_path, cv2.cvtColor(frame_to_save, cv2.COLOR_RGB2BGR))
+                
+                # 保存文本資訊
+                self.save_scores_to_text(txt_path)
+                
+                info_text = f"圖片: {image_path}\n文本: {txt_path}"
+            else:
+                # COORDINATES 模式：只保存圖片和坐標文本
+                image_path = os.path.join(save_dir, f"coordinates_{timestamp}.png")
+                txt_path = os.path.join(save_dir, f"coordinates_{timestamp}.txt")
+                
+                # 保存影像（不添加額外資訊）
+                cv2.imwrite(image_path, cv2.cvtColor(frame_to_save, cv2.COLOR_RGB2BGR))
+                
+                # 保存坐標文本
+                self.save_coordinates_to_text(txt_path)
+                
+                info_text = f"圖片: {image_path}\n文本: {txt_path}"
             
             # 顯示成功訊息
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("保存成功")
             msg_box.setText("文件已成功保存！")
-            msg_box.setInformativeText(f"圖片: {image_path}\n文本: {txt_path}")
+            msg_box.setInformativeText(info_text)
             msg_box.setStyleSheet("""
                 QMessageBox {
                     background-color: white;
@@ -899,6 +1078,18 @@ class MainWindow(QMainWindow):
         file.write(f"  Table B 分數: {table_b}\n")
         file.write(f"  Table C 分數 (總分): {table_c}\n")
     
+    def save_coordinates_to_text(self, filepath):
+        """保存坐標到文本文件"""
+        with open(filepath, 'w', encoding='utf-8') as f:
+            # 獲取當前顯示的坐標文本
+            coord_text = self.coordinates_group.text_edit.toPlainText()
+            
+            f.write("關鍵點坐標數據\n")
+            f.write("=" * 70 + "\n")
+            f.write(f"時間: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 70 + "\n\n")
+            f.write(coord_text)
+    
     def show_config_dialog(self):
         """顯示參數設定對話框"""
         dialog = QDialog(self)
@@ -995,6 +1186,10 @@ class MainWindow(QMainWindow):
         # 停止 Kinect
         if self.kinect_handler:
             self.kinect_handler.stop()
+        
+        # 停止 Kinect RGB
+        if self.kinect_rgb_handler:
+            self.kinect_rgb_handler.stop()
         
         # 關閉 MediaPipe pose detector
         if self.pose_detector:
