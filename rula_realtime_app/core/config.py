@@ -57,13 +57,6 @@ MEDIAPIPE_CONFIG = {
     'min_detection_confidence': 0.5,
     'min_tracking_confidence': 0.5
 }
-# === Sampling settings (新增) ===
-ENABLE_VALID_FRAME_SAMPLING = False           # 是否啟用有效影格等間距採樣
-VALID_FRAME_SAMPLING_EVERY = 3               # 等間距採樣步長：每幾張有效影格留一張
-SAMPLED_FRAME_IMAGE_FORMAT = "jpg"           # 影像格式：'jpg' 或 'png'
-SAMPLED_FRAME_DIR_NAME = "sampled_frames"    # 採樣影像存放的子資料夾名稱
-SAMPLED_CSV_NAME = "valid_samples.csv"       # 對照表 CSV 檔名
-SAMPLED_JPG_QUALITY = 95                     # JPG 品質(1-100)，僅 jpg 有效
 
 # === Azure Kinect 關節映射 (新增) ===
 # Azure Kinect joint indices (K4ABT)
