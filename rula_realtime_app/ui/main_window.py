@@ -83,6 +83,13 @@ class MainWindow(QMainWindow):
         # 最後的骨架繪製結果（用於未處理的幀）
         self.last_annotated_frame = None
         
+        # 倒數保存功能
+        self.countdown_active = False
+        self.countdown_value = 0
+        self.countdown_timer = QTimer()
+        self.countdown_timer.timeout.connect(self.update_countdown)
+        self.frame_to_save = None
+        
         # 顯示模式 - 從 config 模組動態讀取
         self.display_mode = core_config.DISPLAY_MODE  # "RULA" 或 "COORDINATES"
         
@@ -119,8 +126,7 @@ class MainWindow(QMainWindow):
         # 影像標籤
         self.video_label = QLabel()
         self.video_label.setMinimumSize(640, 480)
-        self.video_label.setMaximumSize(640, 480)
-        self.video_label.setScaledContents(True)
+        self.video_label.setMaximumSize(960, 720)  # 增加最大尺寸以容納更大的畫面
         self.video_label.setStyleSheet("""
             border: 3px solid #3498db;
             border-radius: 10px;
@@ -569,6 +575,12 @@ class MainWindow(QMainWindow):
         self.is_paused = False
         self.pause_button.setText("暫停")
         
+        # 停止倒數計時器
+        if self.countdown_active:
+            self.countdown_timer.stop()
+            self.countdown_active = False
+            self.countdown_value = 0
+        
         # 重置 FPS 顯示
         self.current_fps = 0.0
         self.fps_label.setText("FPS: 0.0")
@@ -791,11 +803,46 @@ class MainWindow(QMainWindow):
         Args:
             frame: RGB 格式的影像
         """
+        # 如果正在倒數，在畫面上繪製倒數數字
+        if self.countdown_active and self.countdown_value > 0:
+            frame_copy = frame.copy()
+            h, w = frame_copy.shape[:2]
+            
+            # 計算文字大小和位置
+            font = cv2.FONT_HERSHEY_SIMPLEX  # 使用 SIMPLEX 字體
+            font_scale = 8
+            thickness = 15
+            text = str(self.countdown_value)
+            
+            # 獲取文字大小
+            (text_width, text_height), baseline = cv2.getTextSize(text, font, font_scale, thickness)
+            
+            # 居中位置
+            x = (w - text_width) // 2
+            y = (h + text_height) // 2
+            
+            # 繪製半透明背景
+            overlay = frame_copy.copy()
+            cv2.circle(overlay, (w // 2, h // 2), 150, (0, 0, 0), -1)
+            cv2.addWeighted(overlay, 0.6, frame_copy, 0.4, 0, frame_copy)
+            
+            # 繪製倒數數字（黃色）
+            cv2.putText(frame_copy, text, (x, y), font, font_scale, (0, 255, 255), thickness)
+            
+            frame = frame_copy
+        
         h, w, ch = frame.shape
         bytes_per_line = ch * w
         qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_image)
-        self.video_label.setPixmap(pixmap)
+        
+        # 縮放以適應標籤大小，同時保持寬高比
+        scaled_pixmap = pixmap.scaled(
+            self.video_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.video_label.setPixmap(scaled_pixmap)
     
     def on_error(self, error_msg):
         """處理錯誤"""
@@ -857,7 +904,7 @@ class MainWindow(QMainWindow):
             self.pause_button.setText("暫停")
     
     def save_snapshot(self):
-        """保存當前畫面和分數"""
+        """開始倒數3秒後保存當前畫面和分數"""
         if self.current_frame is None:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -884,6 +931,31 @@ class MainWindow(QMainWindow):
                 }
             """)
             msg_box.exec()
+            return
+        
+        # 如果已經在倒數中，忽略
+        if self.countdown_active:
+            return
+        
+        # 開始倒數
+        self.countdown_active = True
+        self.countdown_value = 3
+        self.countdown_timer.start(1000)  # 每秒更新一次
+    
+    def update_countdown(self):
+        """更新倒數計時器"""
+        if self.countdown_value > 0:
+            # 繼續倒數
+            self.countdown_value -= 1
+        else:
+            # 倒數結束，執行保存
+            self.countdown_timer.stop()
+            self.countdown_active = False
+            self.perform_save()
+    
+    def perform_save(self):
+        """執行實際的保存操作"""
+        if self.current_frame is None:
             return
         
         try:

@@ -35,7 +35,7 @@ def load_kinect_libraries():
 # RULA 固定參數設定
 RULA_CONFIG = {
     'wrist_twist': 1,        # 手腕扭轉參數
-    'legs': 1,               # 腿部姿勢參數
+    'legs': 2,               # 腿部姿勢參數
     'muscle_use_a': 0,         # Table A 肌肉使用參數
     'muscle_use_b': 0,         # Table B 肌肉使用參數
     'force_load_a': 0,       # Table A 負荷力量參數
