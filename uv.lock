@@ -271,37 +271,6 @@ wheels = [
 ]
 
 [[package]]
-name = "hfe-kinect"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "mediapipe" },
-    { name = "numpy" },
-    { name = "opencv-python" },
-    { name = "pykinect-azure" },
-    { name = "pyqt6" },
-    { name = "pyqt6-qt6" },
-    { name = "pyqt6-sip" },
-    { name = "pyqt6-tools" },
-    { name = "setuptools" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "matplotlib", specifier = ">=3.10.8" },
-    { name = "mediapipe", specifier = "==0.10.14" },
-    { name = "numpy", specifier = ">=1.24.0" },
-    { name = "opencv-python", specifier = ">=4.8.0" },
-    { name = "pykinect-azure", specifier = ">=0.0.4" },
-    { name = "pyqt6", specifier = "==6.4.2" },
-    { name = "pyqt6-qt6", specifier = "==6.4.3" },
-    { name = "pyqt6-sip", specifier = "==13.10.2" },
-    { name = "pyqt6-tools", specifier = "==6.4.2.3.3" },
-    { name = "setuptools", specifier = ">=80.9.0" },
-]
-
-[[package]]
 name = "jax"
 version = "0.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -963,6 +932,37 @@ dependencies = [
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/18/5f/58fd48246779de82bd15a9cb1bface620fb7b6009ee5a5544f1a5ca39cdb/qt6_tools-6.4.3.1.3-py3-none-any.whl", hash = "sha256:dd01cdf830ec8a14f353b7f6d0b81eb4d7472b86f9fa8e872c8ed9c3465726e3", size = 13622, upload-time = "2023-03-27T15:03:23.324Z" },
+]
+
+[[package]]
+name = "rula-realtime-app"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "mediapipe" },
+    { name = "numpy" },
+    { name = "opencv-python" },
+    { name = "pykinect-azure" },
+    { name = "pyqt6" },
+    { name = "pyqt6-qt6" },
+    { name = "pyqt6-sip" },
+    { name = "pyqt6-tools" },
+    { name = "setuptools" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "matplotlib", specifier = ">=3.10.8" },
+    { name = "mediapipe", specifier = "==0.10.14" },
+    { name = "numpy", specifier = ">=1.24.0" },
+    { name = "opencv-python", specifier = ">=4.8.0" },
+    { name = "pykinect-azure", specifier = ">=0.0.4" },
+    { name = "pyqt6", specifier = "==6.4.2" },
+    { name = "pyqt6-qt6", specifier = "==6.4.3" },
+    { name = "pyqt6-sip", specifier = "==13.10.2" },
+    { name = "pyqt6-tools", specifier = "==6.4.2.3.3" },
+    { name = "setuptools", specifier = ">=80.9.0" },
 ]
 
 [[package]]
