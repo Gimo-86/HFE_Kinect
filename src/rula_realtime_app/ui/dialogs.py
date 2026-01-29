@@ -2,77 +2,63 @@
 Dialog windows for RULA application
 """
 
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, 
-                             QDialogButtonBox, QGridLayout, QPushButton)
-from ..core.config import RULA_CONFIG
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
+                             QGridLayout, QPushButton)
+from ..core import config
+from .styles import RULA_CONFIG_DIALOG_STYLE
 
 
 class RULAConfigDialog(QDialog):
-    """Configuration dialog for RULA parameters"""
+    """Configuration dialog for RULA parameters with dropdown controls"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("RULA 預設參數設定")
-        self.setMinimumSize(400, 350)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #2c3e50;
-                color: #ecf0f1;
-            }
-            QLabel {
-                color: #ecf0f1;
-                font-size: 13px;
-            }
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3498db, stop:1 #2980b9);
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                padding: 10px 20px;
-                border: none;
-                border-radius: 6px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #5dade2, stop:1 #3498db);
-            }
-        """)
+        self.setMinimumSize(500, 450)
+        self.setStyleSheet(RULA_CONFIG_DIALOG_STYLE)
+        
+        # Store references to combo boxes for retrieval
+        self.combos = {}
         
         layout = QVBoxLayout()
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
         # 標題
-        title_label = QLabel("目前使用的 RULA 固定參數：")
+        title_label = QLabel("調整 RULA 固定參數：")
         title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #3498db; margin-bottom: 10px;")
         layout.addWidget(title_label)
         
         # 參數網格
         grid_layout = QGridLayout()
         grid_layout.setSpacing(12)
+        grid_layout.setColumnStretch(0, 2)
+        grid_layout.setColumnStretch(1, 1)
         
-        params = [
-            ("手腕扭轉 (wrist_twist):", RULA_CONFIG['wrist_twist'], "1=中立位置, 2=扭轉"),
-            ("腿部姿勢 (legs):", RULA_CONFIG['legs'], "1=平衡站立/坐姿, 2=不平衡"),
-            ("肌肉使用-手臂 (muscle_use_a):", RULA_CONFIG['muscle_use_a'], "0=無, 1=靜態/重複"),
-            ("肌肉使用-身體 (muscle_use_b):", RULA_CONFIG['muscle_use_b'], "0=無, 1=靜態/重複"),
-            ("負荷力量-手臂 (force_load_a):", RULA_CONFIG['force_load_a'], "0=<2kg, 1=2-10kg, 2=>10kg"),
-            ("負荷力量-身體 (force_load_b):", RULA_CONFIG['force_load_b'], "0=<2kg, 1=2-10kg, 2=>10kg"),
+        # Define parameter options
+        param_config = [
+            ("wrist_twist", "手腕扭轉 (wrist_twist):", ["1 - 中立位置", "2 - 扭轉"], "1=中立位置, 2=扭轉"),
+            ("legs", "腿部姿勢 (legs):", ["1 - 平衡站立/坐姿", "2 - 不平衡"], "1=平衡站立/坐姿, 2=不平衡"),
+            ("muscle_use_a", "肌肉使用-手臂 (muscle_use_a):", ["0 - 無", "1 - 靜態/重複"], "0=無, 1=靜態/重複"),
+            ("muscle_use_b", "肌肉使用-身體 (muscle_use_b):", ["0 - 無", "1 - 靜態/重複"], "0=無, 1=靜態/重複"),
+            ("force_load_a", "負荷力量-手臂 (force_load_a):", ["0 - <2kg", "1 - 2-10kg", "2 - >10kg"], "0=<2kg, 1=2-10kg, 2=>10kg"),
+            ("force_load_b", "負荷力量-身體 (force_load_b):", ["0 - <2kg", "1 - 2-10kg", "2 - >10kg"], "0=<2kg, 1=2-10kg, 2=>10kg"),
         ]
         
         row = 0
-        for param_name, param_value, param_desc in params:
+        for param_key, param_name, options, param_desc in param_config:
             # 參數名稱
             name_label = QLabel(param_name)
             name_label.setStyleSheet("font-weight: bold; color: #ecf0f1;")
             grid_layout.addWidget(name_label, row, 0)
             
-            # 參數值
-            value_label = QLabel(str(param_value))
-            value_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #f39c12;")
-            grid_layout.addWidget(value_label, row, 1)
+            # 下拉選單
+            combo = QComboBox()
+            combo.addItems(options)
+            current_value = getattr(config.RULA_CONFIG, param_key, config.RULA_CONFIG[param_key])
+            combo.setCurrentIndex(current_value)
+            self.combos[param_key] = combo
+            grid_layout.addWidget(combo, row, 1)
             row += 1
             
             # 參數說明
@@ -85,12 +71,30 @@ class RULAConfigDialog(QDialog):
         layout.addLayout(grid_layout)
         layout.addStretch()
         
+        # 按鈕佈局
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+        
+        # 保存按鈕
+        save_button = QPushButton("保存")
+        save_button.clicked.connect(self.save_config)
+        button_layout.addWidget(save_button)
+        
         # 關閉按鈕
         close_button = QPushButton("關閉")
         close_button.clicked.connect(self.accept)
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
         button_layout.addWidget(close_button)
+        
         layout.addLayout(button_layout)
         
-        self.setLayout(layout)    
+        self.setLayout(layout)
+    
+    def save_config(self):
+        """Save the current parameter values back to config"""
+        for param_key, combo in self.combos.items():
+            # Extract the numeric value from the option string (e.g., "0 - <2kg" -> 0)
+            value = int(combo.currentText().split(" ")[0])
+            config.RULA_CONFIG[param_key] = value
+        
+        # Optionally show confirmation or just close
+        self.accept()    

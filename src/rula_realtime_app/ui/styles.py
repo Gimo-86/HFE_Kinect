@@ -120,6 +120,51 @@ def _messagebox_style(font_size=11, label_min_width=""):
             }}
         """
 
+def _dialog_style():
+    """Generate dialog stylesheet with dark theme and combo boxes"""
+    return f"""
+            QDialog {{
+                background-color: {DARK_BG};
+                color: {LIGHT_TEXT};
+            }}
+            QLabel {{
+                color: {LIGHT_TEXT};
+                font-size: 13px;
+            }}
+            QComboBox {{
+                background-color: {DARK_BG_ALT};
+                color: {LIGHT_TEXT};
+                border: 1px solid {PRIMARY_ACCENT};
+                border-radius: 4px;
+                padding: 5px;
+                font-size: 12px;
+                min-width: 100px;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {DARK_BG_ALT};
+                color: {LIGHT_TEXT};
+                selection-background-color: {PRIMARY_ACCENT};
+            }}
+            QPushButton {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 {PRIMARY_ACCENT}, stop:1 #2980b9);
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+                padding: 10px 20px;
+                border: none;
+                border-radius: 6px;
+                min-width: 80px;
+            }}
+            QPushButton:hover {{
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5dade2, stop:1 {PRIMARY_ACCENT});
+            }}
+        """
+
 # ============================================================================
 # GENERATED STYLES
 # ============================================================================
@@ -149,6 +194,9 @@ CONFIG_BUTTON_STYLE = _button_style(BTN_PURPLE, BTN_PURPLE_DARK, BTN_PURPLE_LIGH
 ERROR_MESSAGEBOX_STYLE = _messagebox_style(font_size=11)
 SUCCESS_MESSAGEBOX_STYLE = _messagebox_style(font_size=11)
 MESSAGEBOX_WIDE_STYLE = _messagebox_style(font_size=12, label_min_width="200px")
+
+# Dialog style using macro
+RULA_CONFIG_DIALOG_STYLE = _dialog_style()
 
 VIDEO_LABEL_STYLE = f"""
             border: 3px solid {PRIMARY_ACCENT};
