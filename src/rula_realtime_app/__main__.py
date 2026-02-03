@@ -11,8 +11,8 @@ if __name__ == '__main__':
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication
-from ui.main_window import MainWindow
-import core.config as config
+from .ui.main_window import MainWindow
+from .core import config
 
 
 def main():
