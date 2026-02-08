@@ -251,7 +251,14 @@ class FrameRenderer:
         bytes_per_line = ch * w
         qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_image)
-        label.setPixmap(pixmap)
+        
+        # 縮放以適應標籤大小，同時保持寬高比
+        scaled_pixmap = pixmap.scaled(
+            label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        label.setPixmap(scaled_pixmap)
     
     @staticmethod
     def draw_scores_on_frame(frame, left_score, right_score):
@@ -306,12 +313,18 @@ class SnapshotManager:
     """Handle snapshot saving functionality"""
     
     SNAPSHOT_DIR = "rula_snapshots"
+    RECORDING_DIR = "rula_records"
     
     @staticmethod
-    def ensure_directory_exists():
-        """確保保存目錄存在"""
-        if not os.path.exists(SnapshotManager.SNAPSHOT_DIR):
-            os.makedirs(SnapshotManager.SNAPSHOT_DIR)
+    def ensure_directory_exists(directory=None):
+        """確保保存目錄存在
+        
+        Args:
+            directory: 指定目錄，若為 None 則使用 SNAPSHOT_DIR
+        """
+        target_dir = directory if directory else SnapshotManager.SNAPSHOT_DIR
+        if not os.path.exists(target_dir):
+            os.makedirs(target_dir, exist_ok=True)
     
     @staticmethod
     def save_rula_snapshot(frame, left_panel, right_panel, parent_window=None):

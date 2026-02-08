@@ -237,3 +237,25 @@ FPS_LABEL_STYLE = f"""
             border-radius: 8px;
             color: {PRIMARY_ACCENT};
         """
+
+# Record button style (Red when recording)
+RECORD_BUTTON_STYLE = _button_style(
+    normal_light=BTN_RED_LIGHT,
+    normal_dark=BTN_RED_DARK,
+    hover_light=BTN_RED_LIGHT,
+    hover_dark=BTN_RED,
+    pressed=BTN_RED_DARK,
+    width=100,
+    font_size=16
+)
+
+# Record button style (Inactive/Ready to record)
+RECORD_BUTTON_READY_STYLE = _button_style(
+    normal_light="#7f8c8d",
+    normal_dark="#5d6d7e",
+    hover_light="#95a5a6",
+    hover_dark="#7f8c8d",
+    pressed="#5d6d7e",
+    width=100,
+    font_size=16
+)
