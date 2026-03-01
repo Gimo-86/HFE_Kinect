@@ -206,5 +206,9 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# RULA Snapshots
+# RULA Application Output Files
+# Snapshot images and RULA score data
 rula_snapshots/
+
+# Recording videos, charts, and RULA score reports
+rula_records/

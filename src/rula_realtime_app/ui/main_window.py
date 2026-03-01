@@ -16,8 +16,9 @@ from ..core import angle_calc, get_best_rula_score
 from ..core import config as core_config
 
 from .styles import *
-from .components import ScorePanel, CoordinatesPanel, FrameRenderer, SnapshotManager
+from .components import ScorePanel, CoordinatesPanel, FrameRenderer, SnapshotManager, ChartGenerator
 from .dialogs import RULAConfigDialog
+from .language import language_manager, t
 
 
 # 嘗試導入所有可能的相機模組（動態判斷）
@@ -44,17 +45,21 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         
+        # 語言管理器
+        self.lang = language_manager
+        self.lang.add_observer(self.on_language_changed)
+        
         # 從 config 動態讀取相機模式
         self.camera_mode = core_config.CAMERA_MODE
         
         # 根據配置設定視窗標題
-        source_types = {
-            "WEBCAM": "攝像頭",
-            "KINECT": "Azure Kinect",
-            "KINECT_RGB": "Kinect RGB + MediaPipe"
-        }
-        source_type = source_types.get(self.camera_mode, "攝像頭")
-        self.setWindowTitle(f"RULA 即時評估系統 - {source_type}")
+        self.source_type_key = {
+            "WEBCAM": "source_webcam",
+            "KINECT": "source_kinect",
+            "KINECT_RGB": "source_kinect"
+        }.get(self.camera_mode, "source_webcam")
+        
+        self.update_window_title()
         self.setGeometry(100, 100, 1400, 700)  # 加寬視窗
         
         # 核心元件
@@ -73,6 +78,7 @@ class MainWindow(QMainWindow):
         
         # FPS 資訊
         self.current_fps = 0.0
+        self.current_rula_freq = 0.0
         self.fps_counter = 0
         self.fps_timer = cv2.getTickCount()
         
@@ -129,51 +135,59 @@ class MainWindow(QMainWindow):
         self.video_label.setMaximumSize(960, 720)  # 增加最大尺寸以容納更大的畫面
         self.video_label.setStyleSheet(VIDEO_LABEL_STYLE)
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.video_label.setText("等待開始...")
+        self.video_label.setText(t('status_waiting'))
         left_layout.addWidget(self.video_label)
         
         # 控制按鈕
         button_layout = QHBoxLayout()
         
-        self.start_button = QPushButton("開始")
+        self.start_button = QPushButton(t('btn_start'))
         self.start_button.clicked.connect(self.start_detection)
         self.start_button.setStyleSheet(START_BUTTON_STYLE)
         button_layout.addWidget(self.start_button)
         
-        self.stop_button = QPushButton("停止")
+        self.stop_button = QPushButton(t('btn_stop'))
         self.stop_button.clicked.connect(self.stop_detection)
         self.stop_button.setEnabled(False)
         self.stop_button.setStyleSheet(STOP_BUTTON_STYLE)
         button_layout.addWidget(self.stop_button)
         
-        self.pause_button = QPushButton("暫停")
+        self.pause_button = QPushButton(t('btn_pause'))
         self.pause_button.clicked.connect(self.toggle_pause)
         self.pause_button.setEnabled(False)
         self.pause_button.setStyleSheet(PAUSE_BUTTON_STYLE)
         button_layout.addWidget(self.pause_button)
         
-        self.save_button = QPushButton("💾 保存")
+        self.save_button = QPushButton(t('btn_snapshot'))
         self.save_button.clicked.connect(self.save_snapshot)
         self.save_button.setEnabled(False)
-        self.save_button.setToolTip("保存當前畫面和分數")
+        self.save_button.setToolTip(t('tooltip_snapshot'))
         self.save_button.setStyleSheet(SAVE_BUTTON_STYLE)
         button_layout.addWidget(self.save_button)
         
-        self.record_button = QPushButton("⏺ 錄影")
+        self.record_button = QPushButton(t('btn_record'))
         self.record_button.clicked.connect(self.toggle_recording)
         self.record_button.setEnabled(False)
-        self.record_button.setToolTip("開始/停止錄影")
+        self.record_button.setToolTip(t('tooltip_record'))
         self.record_button.setStyleSheet(RECORD_BUTTON_READY_STYLE)
         button_layout.addWidget(self.record_button)
         
-        self.fps_label = QLabel("FPS: 0.0")
-        self.fps_label.setStyleSheet(FPS_LABEL_STYLE)
-        button_layout.addWidget(self.fps_label)
+        self.rula_freq_label = QLabel(t('rula_freq_label').format('0.0'))
+        self.rula_freq_label.setStyleSheet(FPS_LABEL_STYLE)
+        self.rula_freq_label.setToolTip(t('tooltip_rula_freq'))
+        button_layout.addWidget(self.rula_freq_label)
+        
+        # 語言切換按鈕
+        self.lang_button = QPushButton(t('btn_language'))
+        self.lang_button.clicked.connect(self.toggle_language)
+        self.lang_button.setToolTip(t('tooltip_language'))
+        self.lang_button.setStyleSheet(CONFIG_BUTTON_STYLE)
+        button_layout.addWidget(self.lang_button)
         
         # 參數設定按鈕（齒輪圖案）
         self.config_button = QPushButton("⚙")
         self.config_button.clicked.connect(self.show_config_dialog)
-        self.config_button.setToolTip("RULA 參數設定")
+        self.config_button.setToolTip(t('tooltip_config'))
         self.config_button.setStyleSheet(CONFIG_BUTTON_STYLE)
         button_layout.addWidget(self.config_button)
         
@@ -194,19 +208,79 @@ class MainWindow(QMainWindow):
         # 根據顯示模式創建不同的面板
         if self.display_mode == "RULA":
             # RULA 評估模式
-            self.left_group = ScorePanel("左側 RULA 評估")
+            self.left_group = ScorePanel(t('panel_left_rula'))
             self.left_group.setMinimumHeight(280)
             right_layout.addWidget(self.left_group, stretch=1)  # 給予伸縮權重
             
-            self.right_group = ScorePanel("右側 RULA 評估")
+            self.right_group = ScorePanel(t('panel_right_rula'))
             self.right_group.setMinimumHeight(280)
             right_layout.addWidget(self.right_group, stretch=1)  # 給予伸縮權重
         else:
             # 坐標顯示模式
-            self.coordinates_group = CoordinatesPanel("關鍵點坐標")
+            self.coordinates_group = CoordinatesPanel(t('panel_coordinates'))
             right_layout.addWidget(self.coordinates_group, stretch=1)  # 給予伸縮權重
         
         main_layout.addWidget(right_widget, stretch=2)  # 右側佔2份
+    
+    def update_window_title(self):
+        """更新窗口标题"""
+        source_type = t(self.source_type_key)
+        title = t('window_title_with_source').format(source_type)
+        self.setWindowTitle(title)
+    
+    def toggle_language(self):
+        """切换语言"""
+        current = self.lang.get_language()
+        new_lang = 'zh_TW' if current == 'en' else 'en'
+        self.lang.set_language(new_lang)
+    
+    def on_language_changed(self, lang_code):
+        """语言改变时更新所有UI文本"""
+        # 更新窗口标题
+        self.update_window_title()
+        
+        # 更新按钮文本
+        self.start_button.setText(t('btn_start'))
+        self.stop_button.setText(t('btn_stop'))
+        
+        # 暂停/继续按钮需要根据当前状态设置
+        if self.is_paused:
+            self.pause_button.setText(t('btn_resume'))
+        else:
+            self.pause_button.setText(t('btn_pause'))
+        
+        self.save_button.setText(t('btn_snapshot'))
+        self.save_button.setToolTip(t('tooltip_snapshot'))
+        
+        # 录影按钮需要根据当前状态设置
+        if self.is_recording:
+            self.record_button.setText(t('btn_stop_record'))
+        else:
+            self.record_button.setText(t('btn_record'))
+        self.record_button.setToolTip(t('tooltip_record'))
+        
+        self.lang_button.setText(t('btn_language'))
+        self.lang_button.setToolTip(t('tooltip_language'))
+        self.config_button.setToolTip(t('tooltip_config'))
+        
+        # 更新 RULA 频率标签
+        if hasattr(self, 'current_rula_freq'):
+            self.rula_freq_label.setText(t('rula_freq_label').format(f'{self.current_rula_freq:.1f}'))
+        self.rula_freq_label.setToolTip(t('tooltip_rula_freq'))
+        
+        # 更新状态标签（如果当前显示的是状态文本）
+        current_text = self.video_label.text()
+        if current_text == "等待開始..." or current_text == "Waiting to start...":
+            self.video_label.setText(t('status_waiting'))
+        elif current_text == "已停止" or current_text == "Stopped":
+            self.video_label.setText(t('status_stopped'))
+        
+        # 更新面板标题（如果是RULA模式）
+        if self.display_mode == "RULA" and hasattr(self, 'left_group'):
+            self.left_group.setTitle(t('panel_left_rula'))
+            self.right_group.setTitle(t('panel_right_rula'))
+        elif self.display_mode == "COORDINATES" and hasattr(self, 'coords_panel'):
+            self.coords_panel.setTitle(t('panel_coordinates'))
         
     def start_detection(self):
         """開始辨識"""
@@ -239,7 +313,7 @@ class MainWindow(QMainWindow):
         
         # 重置暫停狀態和 FPS 計數器
         self.is_paused = False
-        self.pause_button.setText("暫停")
+        self.pause_button.setText(t('btn_pause'))
         self.fps_counter = 0
         self.fps_timer = cv2.getTickCount()
         
@@ -288,7 +362,7 @@ class MainWindow(QMainWindow):
         self.prev_left = None
         self.prev_right = None
         self.is_paused = False
-        self.pause_button.setText("暫停")
+        self.pause_button.setText(t('btn_pause'))
         
         # 停止倒數計時器
         if self.countdown_active:
@@ -299,12 +373,13 @@ class MainWindow(QMainWindow):
         if self.is_recording:
             self.stop_recording()
         
-        # 重置 FPS 顯示
+        # 重置頻率顯示
         self.current_fps = 0.0
-        self.fps_label.setText("FPS: 0.0")
+        self.current_rula_freq = 0.0
+        self.rula_freq_label.setText(t('rula_freq_label').format('0.0'))
         
         # 重置顯示
-        self.video_label.setText("已停止")
+        self.video_label.setText(t('status_stopped'))
         
         # 根據顯示模式重置面板
         if self.display_mode == "RULA":
@@ -491,18 +566,18 @@ class MainWindow(QMainWindow):
     def on_error(self, error_msg):
         """處理錯誤"""
         # 在視窗上顯示錯誤
-        self.video_label.setText(f"錯誤: {error_msg}")
+        self.video_label.setText(t('status_error').format(error_msg))
         
         # 彈出錯誤對話框
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("錯誤")
+        msg_box.setWindowTitle(t('msg_error'))
         
         # 設置主要文本
-        if "Kinect" in error_msg or "連接" in error_msg:
-            msg_box.setText("Azure Kinect 連接失敗")
+        if "Kinect" in error_msg or "連接" in error_msg or "connection" in error_msg.lower():
+            msg_box.setText(t('msg_kinect_connection_failed'))
         else:
-            msg_box.setText("發生錯誤")
+            msg_box.setText(t('msg_generic_error'))
         
         # 設置詳細信息（不使用 DetailedText 避免出現細節按鈕）
         msg_box.setInformativeText(error_msg)
@@ -517,25 +592,28 @@ class MainWindow(QMainWindow):
         self.stop_detection()
     
     def on_fps_updated(self, fps):
-        """更新 FPS 顯示"""
+        """更新 RULA 頻率顯示"""
         self.current_fps = fps
-        self.fps_label.setText(f"FPS: {fps:.1f}")
+        
+        # 計算 RULA 頻率（FPS ÷ 計算間隔）
+        self.current_rula_freq = fps / self.rula_calc_every_n_frames
+        self.rula_freq_label.setText(t('rula_freq_label').format(f'{self.current_rula_freq:.1f}'))
     
     def toggle_pause(self):
         """切換暫停/繼續"""
         self.is_paused = not self.is_paused
         if self.is_paused:
-            self.pause_button.setText("繼續")
+            self.pause_button.setText(t('btn_resume'))
         else:
-            self.pause_button.setText("暫停")
+            self.pause_button.setText(t('btn_pause'))
     
     def save_snapshot(self):
         """開始倒數3秒後保存當前畫面和分數"""
         if self.current_frame is None:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("警告")
-            msg_box.setText("沒有可保存的畫面")
+            msg_box.setWindowTitle(t('msg_warning'))
+            msg_box.setText(t('msg_no_frame_snapshot'))
             msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
             msg_box.exec()
             return
@@ -582,8 +660,8 @@ class MainWindow(QMainWindow):
                 # 顯示成功訊息
                 msg_box = QMessageBox(self)
                 msg_box.setIcon(QMessageBox.Icon.Information)
-                msg_box.setWindowTitle("保存成功")
-                msg_box.setText("文件已成功保存！")
+                msg_box.setWindowTitle(t('msg_snapshot_success'))
+                msg_box.setText(t('msg_snapshot_saved'))
                 msg_box.setInformativeText(message)
                 msg_box.setStyleSheet(SUCCESS_MESSAGEBOX_STYLE)
                 msg_box.exec()
@@ -591,8 +669,8 @@ class MainWindow(QMainWindow):
                 # 顯示錯誤訊息
                 msg_box = QMessageBox(self)
                 msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("錯誤")
-                msg_box.setText("保存失敗")
+                msg_box.setWindowTitle(t('msg_error'))
+                msg_box.setText(t('msg_snapshot_failed'))
                 msg_box.setInformativeText(message)
                 msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
                 msg_box.exec()
@@ -600,8 +678,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("錯誤")
-            msg_box.setText("保存失敗")
+            msg_box.setWindowTitle(t('msg_error'))
+            msg_box.setText(t('msg_snapshot_failed'))
             msg_box.setInformativeText(str(e))
             msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
             msg_box.exec()
@@ -658,8 +736,8 @@ class MainWindow(QMainWindow):
         if self.current_frame is None:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("警告")
-            msg_box.setText("沒有可錄製的畫面")
+            msg_box.setWindowTitle(t('msg_warning'))
+            msg_box.setText(t('msg_no_frame_record'))
             msg_box.setStyleSheet("QMessageBox {background-color: white;} QLabel {color: black; font-size: 12px;} QPushButton {color: black; background-color: #e0e0e0; border: 1px solid #999; padding: 5px 15px;}")
             msg_box.exec()
             return
@@ -703,7 +781,7 @@ class MainWindow(QMainWindow):
             # 更新按鈕樣式和文字
             from .styles import RECORD_BUTTON_STYLE
             self.record_button.setStyleSheet(RECORD_BUTTON_STYLE)
-            self.record_button.setText("⏹ 停止")
+            self.record_button.setText(t('btn_stop_record'))
             
             # 禁用開始/停止按鈕（錄影期間不能停止檢測）
             self.stop_button.setEnabled(False)
@@ -714,7 +792,7 @@ class MainWindow(QMainWindow):
             error_msg = f"無法開始錄影:\n\n{str(e)}\n\n詳細錯誤:\n{error_detail}"
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("錯誤")
+            msg_box.setWindowTitle(t('msg_error'))
             msg_box.setText(error_msg)
             msg_box.setStyleSheet("QMessageBox {background-color: white;} QLabel {color: black; font-size: 11px; min-width: 400px;} QPushButton {color: black; background-color: #e0e0e0; border: 1px solid #999; padding: 5px 15px;}")
             msg_box.exec()
@@ -738,6 +816,13 @@ class MainWindow(QMainWindow):
                     f"recording_{self.recording_filename}.txt"
                 )
                 self.save_rula_records(txt_path)
+                
+                # 生成圖表
+                chart_path = os.path.join(
+                    SnapshotManager.RECORDING_DIR,
+                    f"recording_{self.recording_filename}_charts.png"
+                )
+                ChartGenerator.generate_rula_charts(self.rula_records, self.recording_start_time, chart_path)
             
             # 顯示錄影完成訊息
             duration = (datetime.now() - self.recording_start_time).total_seconds()
@@ -752,11 +837,16 @@ class MainWindow(QMainWindow):
                     SnapshotManager.RECORDING_DIR, 
                     f"recording_{self.recording_filename}.txt"
                 )
-                msg_text += f"分數記錄: {txt_path}"
+                chart_path = os.path.join(
+                    SnapshotManager.RECORDING_DIR,
+                    f"recording_{self.recording_filename}_charts.png"
+                )
+                msg_text += f"\n分數記錄: {txt_path}\n"
+                msg_text += f"圖表報告: {chart_path}"
             
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("錄影完成")
+            msg_box.setWindowTitle(t('msg_record_complete'))
             msg_box.setText(msg_text)
             msg_box.setStyleSheet("QMessageBox {background-color: white;} QLabel {color: black; font-size: 12px;} QPushButton {color: black; background-color: #e0e0e0; border: 1px solid #999; padding: 5px 15px;}")
             msg_box.exec()
@@ -764,8 +854,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("錯誤")
-            msg_box.setText(f"停止錄影時發生錯誤:\n{str(e)}")
+            msg_box.setWindowTitle(t('msg_error'))
+            msg_box.setText(t('msg_record_stop_error').format(str(e)))
             msg_box.setStyleSheet("QMessageBox {background-color: white;} QLabel {color: black; font-size: 12px;} QPushButton {color: black; background-color: #e0e0e0; border: 1px solid #999; padding: 5px 15px;}")
             msg_box.exec()
         finally:
@@ -780,7 +870,7 @@ class MainWindow(QMainWindow):
             # 恢復按鈕樣式和文字
             from .styles import RECORD_BUTTON_READY_STYLE
             self.record_button.setStyleSheet(RECORD_BUTTON_READY_STYLE)
-            self.record_button.setText("⏺ 錄影")
+            self.record_button.setText(t('btn_record'))
             
             # 重新啟用停止按鈕
             self.stop_button.setEnabled(True)
@@ -804,43 +894,61 @@ class MainWindow(QMainWindow):
         """保存 RULA 分數記錄到文本文件"""
         try:
             with open(filepath, 'w', encoding='utf-8') as f:
-                f.write("RULA 錄影分數記錄\n")
+                f.write(f"{t('record_title')}\n")
                 f.write("=" * 80 + "\n")
-                f.write(f"錄影時間: {self.recording_start_time.strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(f"總時長: {(datetime.now() - self.recording_start_time).total_seconds():.1f} 秒\n")
-                f.write(f"總幀數: {self.recording_frame_count}\n")
-                f.write(f"記錄數量: {len(self.rula_records)}\n")
+                f.write(f"{t('record_time')} {self.recording_start_time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"{t('record_duration')} {(datetime.now() - self.recording_start_time).total_seconds():.1f} {t('record_seconds')}\n")
+                f.write(f"{t('record_frames')} {self.recording_frame_count}\n")
+                f.write(f"{t('record_count')} {len(self.rula_records)}\n")
+                f.write(f"{t('record_rula_calc_setting')}: {t('record_calc_frequency').format(self.rula_calc_every_n_frames, self.current_rula_freq)}\n")
                 f.write("=" * 80 + "\n\n")
                 
                 # 寫入每條記錄
                 for record in self.rula_records:
-                    f.write(f"\n--- 時間: {record['timestamp']:.2f}s | 幀: {record['frame']} ---\n")
-                    f.write("\n【左側】\n")
+                    f.write(f"\n--- {t('record_time_prefix')} {record['timestamp']:.2f}s | {t('record_frame_prefix')} {record['frame']} ---\n")
+                    f.write(f"\n{t('record_left_side')}\n")
                     self._write_rula_data(f, record['left'])
-                    f.write("\n【右側】\n")
+                    f.write(f"\n{t('record_right_side')}\n")
                     self._write_rula_data(f, record['right'])
                     f.write("\n" + "-" * 80 + "\n")
                 
                 # 統計資訊
                 f.write("\n" + "=" * 80 + "\n")
-                f.write("統計資訊\n")
+                f.write(f"{t('record_statistics')}\n")
                 f.write("=" * 80 + "\n")
                 
                 if self.rula_records:
-                    left_scores = [r['left'].get('score', 0) for r in self.rula_records if r['left'].get('score') != '--']
-                    right_scores = [r['right'].get('score', 0) for r in self.rula_records if r['right'].get('score') != '--']
+                    # 過濾並轉換為整數，跳過無效值
+                    left_scores = []
+                    right_scores = []
+                    for r in self.rula_records:
+                        left_score = r['left'].get('score')
+                        right_score = r['right'].get('score')
+                        
+                        # 只添加有效的數字分數
+                        if left_score and left_score not in ['--', 'NULL']:
+                            try:
+                                left_scores.append(int(left_score))
+                            except (ValueError, TypeError):
+                                pass
+                        
+                        if right_score and right_score not in ['--', 'NULL']:
+                            try:
+                                right_scores.append(int(right_score))
+                            except (ValueError, TypeError):
+                                pass
                     
                     if left_scores:
-                        f.write(f"\n左側 RULA 分數:\n")
-                        f.write(f"  平均: {sum(left_scores)/len(left_scores):.2f}\n")
-                        f.write(f"  最小: {min(left_scores)}\n")
-                        f.write(f"  最大: {max(left_scores)}\n")
+                        f.write(f"\n{t('record_left_scores')}\n")
+                        f.write(f"  {t('record_average')} {sum(left_scores)/len(left_scores):.2f}\n")
+                        f.write(f"  {t('record_min')} {min(left_scores)}\n")
+                        f.write(f"  {t('record_max')} {max(left_scores)}\n")
                     
                     if right_scores:
-                        f.write(f"\n右側 RULA 分數:\n")
-                        f.write(f"  平均: {sum(right_scores)/len(right_scores):.2f}\n")
-                        f.write(f"  最小: {min(right_scores)}\n")
-                        f.write(f"  最大: {max(right_scores)}\n")
+                        f.write(f"\n{t('record_right_scores')}\n")
+                        f.write(f"  {t('record_average')} {sum(right_scores)/len(right_scores):.2f}\n")
+                        f.write(f"  {t('record_min')} {min(right_scores)}\n")
+                        f.write(f"  {t('record_max')} {max(right_scores)}\n")
         
         except Exception as e:
             print(f"保存分數記錄失敗: {e}")
@@ -848,17 +956,17 @@ class MainWindow(QMainWindow):
     def _write_rula_data(self, file, rula_data):
         """寫入單側 RULA 數據到文件"""
         if not rula_data:
-            file.write("  無數據\n")
+            file.write(f"  {t('record_no_data')}\n")
             return
         
-        file.write(f"  上臂角度: {rula_data.get('upper_arm_angle', 'NULL')}° (分數: {rula_data.get('upper_arm_score', '--')})\n")
-        file.write(f"  前臂角度: {rula_data.get('lower_arm_angle', 'NULL')}° (分數: {rula_data.get('lower_arm_score', '--')})\n")
-        file.write(f"  手腕角度: {rula_data.get('wrist_angle', 'NULL')}° (分數: {rula_data.get('wrist_score', '--')})\n")
-        file.write(f"  頸部角度: {rula_data.get('neck_angle', 'NULL')}° (分數: {rula_data.get('neck_score', '--')})\n")
-        file.write(f"  軀幹角度: {rula_data.get('trunk_angle', 'NULL')}° (分數: {rula_data.get('trunk_score', '--')})\n")
+        file.write(f"  {t('record_upper_arm')} {rula_data.get('upper_arm_angle', 'NULL')}° ({t('record_score')} {rula_data.get('upper_arm_score', '--')})\n")
+        file.write(f"  {t('record_lower_arm')} {rula_data.get('lower_arm_angle', 'NULL')}° ({t('record_score')} {rula_data.get('lower_arm_score', '--')})\n")
+        file.write(f"  {t('record_wrist')} {rula_data.get('wrist_angle', 'NULL')}° ({t('record_score')} {rula_data.get('wrist_score', '--')})\n")
+        file.write(f"  {t('record_neck')} {rula_data.get('neck_angle', 'NULL')}° ({t('record_score')} {rula_data.get('neck_score', '--')})\n")
+        file.write(f"  {t('record_trunk')} {rula_data.get('trunk_angle', 'NULL')}° ({t('record_score')} {rula_data.get('trunk_score', '--')})\n")
         file.write(f"  Table A: {rula_data.get('wrist_and_arm_score', '--')}\n")
         file.write(f"  Table B: {rula_data.get('neck_trunk_leg_score', '--')}\n")
-        file.write(f"  Table C (總分): {rula_data.get('score', '--')}\n")
+        file.write(f"  Table C ({t('final_score')}): {rula_data.get('score', '--')}\n")
     
     def draw_recording_indicator(self, frame):
         """在影像上繪製錄影指示（紅點+時間）"""
@@ -885,6 +993,41 @@ class MainWindow(QMainWindow):
         # 繪製錄影時間
         cv2.putText(frame_copy, time_str, (w - 110, 38), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        
+        return frame_copy
+    
+    def draw_fps_info(self, frame):
+        """在影像左上角繪製 FPS 和 RULA 頻率信息"""
+        frame_copy = frame.copy()
+        h, w = frame_copy.shape[:2]
+        
+        # 準備顯示文字
+        fps_text = f"FPS: {self.current_fps:.1f}"
+        rula_text = f"RULA: {self.current_rula_freq:.1f} Hz"
+        
+        # 計算文字尺寸以確定背景大小
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        thickness = 2
+        (fps_w, fps_h), _ = cv2.getTextSize(fps_text, font, font_scale, thickness)
+        (rula_w, rula_h), _ = cv2.getTextSize(rula_text, font, font_scale, thickness)
+        
+        # 背景寬度取較大者，高度為兩行文字 + 間距
+        bg_width = max(fps_w, rula_w) + 20
+        bg_height = fps_h + rula_h + 30
+        
+        # 繪製半透明背景（左上角）
+        overlay = frame_copy.copy()
+        cv2.rectangle(overlay, (10, 10), (10 + bg_width, 10 + bg_height), (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.6, frame_copy, 0.4, 0, frame_copy)
+        
+        # 繪製 FPS 文字（青色）
+        cv2.putText(frame_copy, fps_text, (20, 35), 
+                   font, font_scale, (255, 255, 0), thickness)
+        
+        # 繪製 RULA 頻率文字（青色）
+        cv2.putText(frame_copy, rula_text, (20, 35 + fps_h + 15), 
+                   font, font_scale, (255, 255, 0), thickness)
         
         return frame_copy
     

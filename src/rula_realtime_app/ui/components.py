@@ -9,9 +9,14 @@ from PyQt6.QtCore import Qt
 from datetime import datetime
 import cv2
 import os
-
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # 使用非 GUI 後端
+import matplotlib.pyplot as plt
+from matplotlib import font_manager
 
 from .styles import *
+from .language import language_manager, t
 
 
 class ScorePanel(QGroupBox):
@@ -28,40 +33,49 @@ class ScorePanel(QGroupBox):
         super().__init__(title, parent)
         self.setStyleSheet(SCORE_PANEL_STYLE)
         
+        # 注冊語言觀察者
+        self.lang = language_manager
+        self.lang.add_observer(self.on_language_changed)
+        
         self.layout = QGridLayout()
         self.layout.setSpacing(8)
         self.layout.setContentsMargins(10, 10, 10, 10)
         
-        # 角度標籤
+        # 角度標籤 - 使用語言系統
         row = 0
         labels_data = [
-            ("upper_arm", "上臂角度:"),
-            ("lower_arm", "前臂角度:"),
-            ("wrist", "手腕角度:"),
-            ("neck", "頸部角度:"),
-            ("trunk", "軀幹角度:"),
+            ("upper_arm", "label_upper_arm_angle"),
+            ("lower_arm", "label_lower_arm_angle"),
+            ("wrist", "label_wrist_angle"),
+            ("neck", "label_neck_angle"),
+            ("trunk", "label_trunk_angle"),
         ]
         
         self.angle_labels = {}
         self.part_score_labels = {}
-        for key, text in labels_data:
+        self.angle_text_labels = {}  # 保存文本標籤以便更新語言
+        self.score_text_labels = {}  # 保存分數文本標籤
+        
+        for key, text_key in labels_data:
             # 角度標籤
-            label = QLabel(text)
+            label = QLabel(t(text_key))
             label.setStyleSheet("font-size: 13px; color: #ffffff;")
             value = QLabel("--")
             value.setStyleSheet("font-size: 14px; font-weight: bold; color: #ffffff;")
             self.layout.addWidget(label, row, 0)
             self.layout.addWidget(value, row, 1)
             self.angle_labels[key] = value
+            self.angle_text_labels[key] = (label, text_key)  # 保存標籤和翻譯鍵
             
             # 部位分數標籤
-            score_label = QLabel("分數:")
+            score_label = QLabel(t('label_score'))
             score_label.setStyleSheet("font-size: 12px; color: #95a5a6;")
             score_value = QLabel("--")
             score_value.setStyleSheet("font-size: 13px; font-weight: bold; color: #f39c12;")
             self.layout.addWidget(score_label, row, 2)
             self.layout.addWidget(score_value, row, 3)
             self.part_score_labels[key] = score_value
+            self.score_text_labels[key] = score_label  # 保存標籤
             
             row += 1
         
@@ -76,25 +90,41 @@ class ScorePanel(QGroupBox):
         self.layout.addWidget(separator, row, 0, 1, 2)
         row += 1
         
-        # RULA 分數
+        # RULA 分數 - 使用語言系統
         score_data = [
-            ("table_a", "Table A 分數:"),
-            ("table_b", "Table B 分數:"),
-            ("table_c", "Table C 分數:"),
+            ("table_a", "label_table_a_score"),
+            ("table_b", "label_table_b_score"),
+            ("table_c", "label_table_c_score"),
         ]
         
         self.score_labels = {}
-        for key, text in score_data:
-            label = QLabel(text)
+        self.table_text_labels = {}  # 保存 Table 標籤
+        for key, text_key in score_data:
+            label = QLabel(t(text_key))
             label.setStyleSheet("font-size: 13px; color: #3498db; font-weight: bold;")
             value = QLabel("--")
             value.setStyleSheet("font-size: 14px; font-weight: bold; color: #ecf0f1;")
             self.layout.addWidget(label, row, 0)
             self.layout.addWidget(value, row, 1)
             self.score_labels[key] = value
+            self.table_text_labels[key] = (label, text_key)  # 保存標籤和翻譯鍵
             row += 1
         
         self.setLayout(self.layout)
+    
+    def on_language_changed(self, lang_code):
+        """語言改變時更新標籤文本"""
+        # 更新角度標籤
+        for key, (label, text_key) in self.angle_text_labels.items():
+            label.setText(t(text_key))
+        
+        # 更新分數標籤
+        for label in self.score_text_labels.values():
+            label.setText(t('label_score'))
+        
+        # 更新 Table 標籤
+        for key, (label, text_key) in self.table_text_labels.items():
+            label.setText(t(text_key))
     
     def update_score_panel(self, rula_data):
         """
@@ -496,5 +526,143 @@ class SnapshotManager:
                     f.write(f"【{idx:2d}】 {name:20s}\n")
                     f.write(f"      X: {x:7.4f}  Y: {y:7.4f}  Z: {z:7.4f}\n")
                     f.write(f"      Visibility: {vis:.4f}\n\n")
+
+
+class ChartGenerator:
+    """Handle RULA chart generation"""
+    
+    @staticmethod
+    def generate_rula_charts(rula_records, recording_start_time, filepath):
+        """
+        生成 RULA 分數圖表（折線圖+圓餅圖）
+        
+        Args:
+            rula_records: RULA 記錄列表
+            recording_start_time: 錄影開始時間
+            filepath: 輸出圖表文件路徑
+        """
+        try:
+            if not rula_records:
+                return
+            
+            # 提取數據，使用 NaN 表示無效數據
+            timestamps = [r['timestamp'] for r in rula_records]
+            left_scores = []
+            right_scores = []
+            
+            for r in rula_records:
+                # 左側分數處理 - 無效數據使用 NaN
+                left_score = r['left'].get('score', 0)
+                if left_score in ['--', 'NULL', None, '']:
+                    left_scores.append(np.nan)
+                else:
+                    try:
+                        left_scores.append(int(left_score))
+                    except (ValueError, TypeError):
+                        left_scores.append(np.nan)
+                
+                # 右側分數處理 - 無效數據使用 NaN
+                right_score = r['right'].get('score', 0)
+                if right_score in ['--', 'NULL', None, '']:
+                    right_scores.append(np.nan)
+                else:
+                    try:
+                        right_scores.append(int(right_score))
+                    except (ValueError, TypeError):
+                        right_scores.append(np.nan)
+            
+            # 設置中文字體（嘗試使用系統字體）
+            plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS']
+            plt.rcParams['axes.unicode_minus'] = False
+            
+            # 創建圖表 (2行2列)
+            fig = plt.figure(figsize=(16, 10))
+            
+            # === 1. 左側折線圖 ===
+            ax1 = plt.subplot(2, 2, 1)
+            ax1.plot(timestamps, left_scores, 'b-', linewidth=2, label=t('chart_legend_left'), marker='o', markersize=4)
+            ax1.set_xlabel(t('chart_time'), fontsize=12)
+            ax1.set_ylabel(t('chart_score_label'), fontsize=12)
+            ax1.set_title(t('chart_left_line'), fontsize=14, fontweight='bold')
+            ax1.grid(True, alpha=0.3)
+            ax1.legend(fontsize=10)
+            # 設置 Y 軸範圍，使用 nanmax 忽略 NaN 值
+            max_left = np.nanmax(left_scores) if not np.all(np.isnan(left_scores)) else 0
+            max_right = np.nanmax(right_scores) if not np.all(np.isnan(right_scores)) else 0
+            max_score = max(max_left, max_right)
+            ax1.set_ylim(0, max_score + 1 if max_score > 0 else 8)
+            
+            # === 2. 右側折線圖 ===
+            ax2 = plt.subplot(2, 2, 2)
+            ax2.plot(timestamps, right_scores, 'r-', linewidth=2, label=t('chart_legend_right'), marker='s', markersize=4)
+            ax2.set_xlabel(t('chart_time'), fontsize=12)
+            ax2.set_ylabel(t('chart_score_label'), fontsize=12)
+            ax2.set_title(t('chart_right_line'), fontsize=14, fontweight='bold')
+            ax2.grid(True, alpha=0.3)
+            ax2.legend(fontsize=10)
+            # 設置 Y 軸範圍，與左側一致
+            ax2.set_ylim(0, max_score + 1 if max_score > 0 else 8)
+            
+            # === 3. 左側圓餅圖 ===
+            ax3 = plt.subplot(2, 2, 3)
+            left_counts = {}
+            for score in left_scores:
+                # 只統計有效的非 NaN 分數
+                if not np.isnan(score) and score > 0:
+                    left_counts[score] = left_counts.get(score, 0) + 1
+            
+            if left_counts:
+                labels = [t('chart_score_prefix').format(int(score)) for score in sorted(left_counts.keys())]
+                sizes = [left_counts[score] for score in sorted(left_counts.keys())]
+                colors = plt.cm.Blues(np.linspace(0.4, 0.8, len(sizes)))
+                
+                wedges, texts, autotexts = ax3.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%',
+                                                     startangle=90, textprops={'fontsize': 10})
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontweight('bold')
+                ax3.set_title(t('chart_left_pie'), fontsize=14, fontweight='bold')
+            else:
+                ax3.text(0.5, 0.5, t('chart_no_data'), ha='center', va='center', fontsize=14)
+                ax3.set_title(t('chart_left_pie'), fontsize=14, fontweight='bold')
+            
+            # === 4. 右側圓餅圖 ===
+            ax4 = plt.subplot(2, 2, 4)
+            right_counts = {}
+            for score in right_scores:
+                # 只統計有效的非 NaN 分數
+                if not np.isnan(score) and score > 0:
+                    right_counts[score] = right_counts.get(score, 0) + 1
+            
+            if right_counts:
+                labels = [t('chart_score_prefix').format(int(score)) for score in sorted(right_counts.keys())]
+                sizes = [right_counts[score] for score in sorted(right_counts.keys())]
+                colors = plt.cm.Reds(np.linspace(0.4, 0.8, len(sizes)))
+                
+                wedges, texts, autotexts = ax4.pie(sizes, labels=labels, colors=colors, autopct='%1.1f%%',
+                                                     startangle=90, textprops={'fontsize': 10})
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontweight('bold')
+                ax4.set_title(t('chart_right_pie'), fontsize=14, fontweight='bold')
+            else:
+                ax4.text(0.5, 0.5, t('chart_no_data'), ha='center', va='center', fontsize=14)
+                ax4.set_title(t('chart_right_pie'), fontsize=14, fontweight='bold')
+            
+            # 添加總標題
+            duration = timestamps[-1] if timestamps else 0
+            fig.suptitle(t('chart_title').format(duration, len(rula_records)),
+                        fontsize=16, fontweight='bold', y=0.98)
+            
+            plt.tight_layout(rect=[0, 0, 1, 0.96])
+            plt.savefig(filepath, dpi=150, bbox_inches='tight')
+            plt.close()
+            
+            print(f"圖表已保存: {filepath}")
+            
+        except Exception as e:
+            print(f"生成圖表失敗: {e}")
+            import traceback
+            traceback.print_exc()
 
 
