@@ -148,6 +148,27 @@ def _dialog_style():
                 color: {LIGHT_TEXT};
                 selection-background-color: {PRIMARY_ACCENT};
             }}
+            QRadioButton {{
+                color: {LIGHT_TEXT};
+                font-size: 14px;
+                spacing: 10px;
+            }}
+            QRadioButton::indicator {{
+                width: 20px;
+                height: 20px;
+                border-radius: 10px;
+                border: 2px solid {PRIMARY_ACCENT};
+                background-color: {DARK_BG_ALT};
+            }}
+            QRadioButton::indicator:checked {{
+                background-color: {PRIMARY_ACCENT};
+                border: 2px solid {PRIMARY_ACCENT};
+                background: qradialgradient(cx:0.5, cy:0.5, radius:0.5,
+                    fx:0.5, fy:0.5, stop:0 #ffffff, stop:0.5 {PRIMARY_ACCENT}, stop:1 {PRIMARY_ACCENT});
+            }}
+            QRadioButton::indicator:hover {{
+                border: 2px solid #5dade2;
+            }}
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                     stop:0 {PRIMARY_ACCENT}, stop:1 #2980b9);

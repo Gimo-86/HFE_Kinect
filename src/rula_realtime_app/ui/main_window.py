@@ -17,7 +17,7 @@ from ..core import config as core_config
 
 from .styles import *
 from .components import ScorePanel, CoordinatesPanel, FrameRenderer, SnapshotManager, ChartGenerator
-from .dialogs import RULAConfigDialog
+from .dialogs import RULAConfigDialog, LanguageSelectionDialog
 from .language import language_manager, t
 
 
@@ -95,6 +95,7 @@ class MainWindow(QMainWindow):
         # 倒數保存功能
         self.countdown_active = False
         self.countdown_value = 0
+        self.countdown_purpose = None  # "snapshot" 或 "recording"
         self.countdown_timer = QTimer()
         self.countdown_timer.timeout.connect(self.update_countdown)
         self.frame_to_save = None
@@ -229,10 +230,11 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(title)
     
     def toggle_language(self):
-        """切换语言"""
-        current = self.lang.get_language()
-        new_lang = 'zh_TW' if current == 'en' else 'en'
-        self.lang.set_language(new_lang)
+        """打开语言选择对话框"""
+        dialog = LanguageSelectionDialog(self)
+        if dialog.exec():
+            new_lang = dialog.get_selected_language()
+            self.lang.set_language(new_lang)
     
     def on_language_changed(self, lang_code):
         """语言改变时更新所有UI文本"""
@@ -625,6 +627,7 @@ class MainWindow(QMainWindow):
         # 開始倒數
         self.countdown_active = True
         self.countdown_value = 3
+        self.countdown_purpose = "snapshot"
         self.countdown_timer.start(1000)  # 每秒更新一次
     
     def update_countdown(self):
@@ -633,10 +636,16 @@ class MainWindow(QMainWindow):
             # 繼續倒數
             self.countdown_value -= 1
         else:
-            # 倒數結束，執行保存
+            # 倒數結束，根據目的執行對應操作
             self.countdown_timer.stop()
             self.countdown_active = False
-            self.perform_save()
+            
+            if self.countdown_purpose == "snapshot":
+                self.perform_save()
+            elif self.countdown_purpose == "recording":
+                self.perform_start_recording()
+            
+            self.countdown_purpose = None
     
     def perform_save(self):
         """執行實際的保存操作"""
@@ -729,17 +738,29 @@ class MainWindow(QMainWindow):
         if self.is_recording:
             self.stop_recording()
         else:
-            self.start_recording()
+            # 開始倒數後再開始錄影
+            if self.current_frame is None:
+                msg_box = QMessageBox(self)
+                msg_box.setIcon(QMessageBox.Icon.Warning)
+                msg_box.setWindowTitle(t('msg_warning'))
+                msg_box.setText(t('msg_no_frame_record'))
+                msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
+                msg_box.exec()
+                return
+            
+            # 如果已經在倒數中，忽略
+            if self.countdown_active:
+                return
+            
+            # 開始倒數
+            self.countdown_active = True
+            self.countdown_value = 3
+            self.countdown_purpose = "recording"
+            self.countdown_timer.start(1000)  # 每秒更新一次
     
-    def start_recording(self):
-        """開始錄影"""
+    def perform_start_recording(self):
+        """執行實際的開始錄影操作"""
         if self.current_frame is None:
-            msg_box = QMessageBox(self)
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle(t('msg_warning'))
-            msg_box.setText(t('msg_no_frame_record'))
-            msg_box.setStyleSheet("QMessageBox {background-color: white;} QLabel {color: black; font-size: 12px;} QPushButton {color: black; background-color: #e0e0e0; border: 1px solid #999; padding: 5px 15px;}")
-            msg_box.exec()
             return
         
         try:
@@ -901,6 +922,17 @@ class MainWindow(QMainWindow):
                 f.write(f"{t('record_frames')} {self.recording_frame_count}\n")
                 f.write(f"{t('record_count')} {len(self.rula_records)}\n")
                 f.write(f"{t('record_rula_calc_setting')}: {t('record_calc_frequency').format(self.rula_calc_every_n_frames, self.current_rula_freq)}\n")
+                f.write("=" * 80 + "\n\n")
+                
+                # 寫入 RULA 固定參數
+                f.write(f"{t('record_rula_parameters')}\n")
+                f.write("-" * 80 + "\n")
+                f.write(f"{t('record_wrist_twist')} {core_config.RULA_CONFIG['wrist_twist']}\n")
+                f.write(f"{t('record_legs')} {core_config.RULA_CONFIG['legs']}\n")
+                f.write(f"{t('record_muscle_use_a')} {core_config.RULA_CONFIG['muscle_use_a']}\n")
+                f.write(f"{t('record_muscle_use_b')} {core_config.RULA_CONFIG['muscle_use_b']}\n")
+                f.write(f"{t('record_force_load_a')} {core_config.RULA_CONFIG['force_load_a']}\n")
+                f.write(f"{t('record_force_load_b')} {core_config.RULA_CONFIG['force_load_b']}\n")
                 f.write("=" * 80 + "\n\n")
                 
                 # 寫入每條記錄

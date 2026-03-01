@@ -93,8 +93,8 @@ TRANSLATIONS = {
         'zh_TW': '⏹ 停止'
     },
     'btn_language': {
-        'en': 'EN',
-        'zh_TW': '中'
+        'en': '🌐',
+        'zh_TW': '🌐'
     },
     
     # 工具提示
@@ -412,6 +412,32 @@ TRANSLATIONS = {
         'zh_TW': '關閉'
     },
     
+    # 语言选择对话框
+    'lang_dialog_title': {
+        'en': 'Language Selection',
+        'zh_TW': '語言選擇'
+    },
+    'lang_dialog_subtitle': {
+        'en': 'Select your preferred language:',
+        'zh_TW': '選擇您偏好的語言：'
+    },
+    'lang_english': {
+        'en': 'English',
+        'zh_TW': 'English'
+    },
+    'lang_chinese': {
+        'en': '繁體中文 (Traditional Chinese)',
+        'zh_TW': '繁體中文 (Traditional Chinese)'
+    },
+    'lang_confirm': {
+        'en': 'Confirm',
+        'zh_TW': '確認'
+    },
+    'lang_cancel': {
+        'en': 'Cancel',
+        'zh_TW': '取消'
+    },
+    
     # 倒计时
     'countdown': {
         'en': '{}',
@@ -484,6 +510,42 @@ TRANSLATIONS = {
     'record_count': {
         'en': 'Record Count:',
         'zh_TW': '記錄數量:'
+    },
+    'record_rula_calc_setting': {
+        'en': 'RULA Calculation Setting',
+        'zh_TW': 'RULA 計算設定'
+    },
+    'record_calc_frequency': {
+        'en': 'Calculate once every {} frames (approx. {:.1f} Hz)',
+        'zh_TW': '每 {} 幀計算一次 (約 {:.1f} Hz)'
+    },
+    'record_rula_parameters': {
+        'en': 'RULA Fixed Parameters',
+        'zh_TW': 'RULA 固定參數'
+    },
+    'record_wrist_twist': {
+        'en': 'Wrist Twist:',
+        'zh_TW': '手腕扭轉:'
+    },
+    'record_legs': {
+        'en': 'Legs:',
+        'zh_TW': '腿部姿勢:'
+    },
+    'record_muscle_use_a': {
+        'en': 'Muscle Use - Table A:',
+        'zh_TW': '肌肉使用 - Table A:'
+    },
+    'record_muscle_use_b': {
+        'en': 'Muscle Use - Table B:',
+        'zh_TW': '肌肉使用 - Table B:'
+    },
+    'record_force_load_a': {
+        'en': 'Force/Load - Table A:',
+        'zh_TW': '負荷力量 - Table A:'
+    },
+    'record_force_load_b': {
+        'en': 'Force/Load - Table B:',
+        'zh_TW': '負荷力量 - Table B:'
     },
     'record_time_prefix': {
         'en': 'Time:',
