@@ -139,60 +139,60 @@ class MainWindow(QMainWindow):
         self.video_label.setText(t('status_waiting'))
         left_layout.addWidget(self.video_label)
         
-        # 控制按鈕
+        # 控制按鈕（優化佈局以適應不同解析度）
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)  # 減少按鈕間距
         
         self.start_button = QPushButton(t('btn_start'))
         self.start_button.clicked.connect(self.start_detection)
         self.start_button.setStyleSheet(START_BUTTON_STYLE)
-        button_layout.addWidget(self.start_button)
+        button_layout.addWidget(self.start_button, stretch=1)  # 允許按鈕伸縮
         
         self.stop_button = QPushButton(t('btn_stop'))
         self.stop_button.clicked.connect(self.stop_detection)
         self.stop_button.setEnabled(False)
         self.stop_button.setStyleSheet(STOP_BUTTON_STYLE)
-        button_layout.addWidget(self.stop_button)
+        button_layout.addWidget(self.stop_button, stretch=1)  # 允許按鈕伸縮
         
         self.pause_button = QPushButton(t('btn_pause'))
         self.pause_button.clicked.connect(self.toggle_pause)
         self.pause_button.setEnabled(False)
         self.pause_button.setStyleSheet(PAUSE_BUTTON_STYLE)
-        button_layout.addWidget(self.pause_button)
+        button_layout.addWidget(self.pause_button, stretch=1)  # 允許按鈕伸縮
         
         self.save_button = QPushButton(t('btn_snapshot'))
         self.save_button.clicked.connect(self.save_snapshot)
         self.save_button.setEnabled(False)
         self.save_button.setToolTip(t('tooltip_snapshot'))
         self.save_button.setStyleSheet(SAVE_BUTTON_STYLE)
-        button_layout.addWidget(self.save_button)
+        button_layout.addWidget(self.save_button, stretch=1)  # 允許按鈕伸縮
         
         self.record_button = QPushButton(t('btn_record'))
         self.record_button.clicked.connect(self.toggle_recording)
         self.record_button.setEnabled(False)
         self.record_button.setToolTip(t('tooltip_record'))
         self.record_button.setStyleSheet(RECORD_BUTTON_READY_STYLE)
-        button_layout.addWidget(self.record_button)
+        button_layout.addWidget(self.record_button, stretch=1)  # 允許按鈕伸縮
         
         self.rula_freq_label = QLabel(t('rula_freq_label').format('0.0'))
         self.rula_freq_label.setStyleSheet(FPS_LABEL_STYLE)
         self.rula_freq_label.setToolTip(t('tooltip_rula_freq'))
-        button_layout.addWidget(self.rula_freq_label)
+        button_layout.addWidget(self.rula_freq_label, stretch=1)  # 允許標籤伸縮
         
         # 語言切換按鈕
         self.lang_button = QPushButton(t('btn_language'))
         self.lang_button.clicked.connect(self.toggle_language)
         self.lang_button.setToolTip(t('tooltip_language'))
         self.lang_button.setStyleSheet(CONFIG_BUTTON_STYLE)
-        button_layout.addWidget(self.lang_button)
+        button_layout.addWidget(self.lang_button, stretch=1)  # 允許按鈕伸縮
         
         # 參數設定按鈕（齒輪圖案）
         self.config_button = QPushButton("⚙")
         self.config_button.clicked.connect(self.show_config_dialog)
         self.config_button.setToolTip(t('tooltip_config'))
         self.config_button.setStyleSheet(CONFIG_BUTTON_STYLE)
-        button_layout.addWidget(self.config_button)
+        button_layout.addWidget(self.config_button, stretch=0)  # 設定按鈕保持固定大小
         
-        button_layout.addStretch()
         left_layout.addLayout(button_layout)
         
         main_layout.addLayout(left_layout, stretch=3)  # 左側佔3份

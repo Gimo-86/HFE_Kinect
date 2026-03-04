@@ -44,8 +44,10 @@ BTN_PURPLE_LIGHT = "#9b59b6"
 # STYLE GENERATORS (Macro functions)
 # ============================================================================
 def _button_style(normal_light, normal_dark, hover_light, hover_dark, 
-                  pressed, width=100, height=None, font_size=16):
+                  pressed, width=None, height=None, font_size=16):
     """Generate button stylesheet with gradient, hover, and pressed states"""
+    # 只在有指定寬度時設定 min-width 和 max-width
+    width_style = f"min-width: {width}px; max-width: {width}px;" if width else ""
     return f"""
             QPushButton {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -53,11 +55,10 @@ def _button_style(normal_light, normal_dark, hover_light, hover_dark,
                 color: white;
                 font-size: {font_size}px;
                 font-weight: bold;
-                padding: {12 if font_size == 16 else 8}px {24 if font_size == 16 else 16}px;
+                padding: {12 if font_size == 16 else 8}px {16 if font_size == 16 else 12}px;
                 border: none;
                 border-radius: 8px;
-                min-width: {width}px;
-                {f'max-width: {width}px;' if font_size > 16 else ''}
+                {width_style}
             }}
             QPushButton:hover {{
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -203,7 +204,7 @@ MAIN_WINDOW_STYLE = f"""
             }}
         """
 
-# Button styles using macro
+# Button styles using macro (移除固定寬度以適應不同解析度)
 START_BUTTON_STYLE = _button_style(BTN_GREEN_LIGHT, BTN_GREEN, BTN_GREEN_LIGHT, BTN_GREEN, BTN_GREEN_DARK)
 STOP_BUTTON_STYLE = _button_style(BTN_RED, BTN_RED_DARK, BTN_RED_LIGHT, BTN_RED, BTN_RED_DARK)
 PAUSE_BUTTON_STYLE = _button_style(BTN_ORANGE, BTN_ORANGE_DARK, BTN_ORANGE_LIGHT, BTN_ORANGE, BTN_ORANGE_DARK)
@@ -259,24 +260,22 @@ FPS_LABEL_STYLE = f"""
             color: {PRIMARY_ACCENT};
         """
 
-# Record button style (Red when recording)
+# Record button style (Red when recording，移除固定寬度)
 RECORD_BUTTON_STYLE = _button_style(
     normal_light=BTN_RED_LIGHT,
     normal_dark=BTN_RED_DARK,
     hover_light=BTN_RED_LIGHT,
     hover_dark=BTN_RED,
     pressed=BTN_RED_DARK,
-    width=100,
     font_size=16
 )
 
-# Record button style (Inactive/Ready to record)
+# Record button style (Inactive/Ready to record，移除固定寬度)
 RECORD_BUTTON_READY_STYLE = _button_style(
     normal_light="#7f8c8d",
     normal_dark="#5d6d7e",
     hover_light="#95a5a6",
     hover_dark="#7f8c8d",
     pressed="#5d6d7e",
-    width=100,
     font_size=16
 )
