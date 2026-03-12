@@ -55,8 +55,11 @@ class RULAConfigDialog(QDialog):
             # 下拉選單
             combo = QComboBox()
             combo.addItems(options)
-            current_value = getattr(config.RULA_CONFIG, param_key, config.RULA_CONFIG[param_key])
-            combo.setCurrentIndex(current_value)
+            # Get current value from config dictionary
+            current_value = config.RULA_CONFIG[param_key]
+            # Find the index matching the current value (extract from "0 - <2kg" format)
+            current_index = next((i for i, opt in enumerate(options) if int(opt.split(" ")[0]) == current_value), 0)
+            combo.setCurrentIndex(current_index)
             self.combos[param_key] = combo
             grid_layout.addWidget(combo, row, 1)
             row += 1
