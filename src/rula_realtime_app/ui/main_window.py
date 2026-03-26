@@ -3,7 +3,7 @@
 """
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QPushButton, QLabel, QMessageBox)
+                             QPushButton, QLabel, QMessageBox, QSizePolicy)
 from PyQt6.QtCore import Qt
 import numpy as np
 import cv2
@@ -45,14 +45,6 @@ class MainWindow(QMainWindow):
         # 從 config 動態讀取相機模式
         self.camera_mode = core_config.CAMERA_MODE
         
-        # 根據配置設定視窗標題
-        source_types = {
-            "WEBCAM": "攝像頭",
-            "KINECT": "Azure Kinect",
-            "KINECT_RGB": "Kinect RGB + MediaPipe"
-        }
-        source_type = source_types.get(self.camera_mode, "攝像頭")
-        self.setWindowTitle(f"RULA 即時評估系統 - {source_type}")
         self.setGeometry(100, 100, 1400, 700)  # 加寬視窗
         
         # 核心元件
@@ -89,6 +81,7 @@ class MainWindow(QMainWindow):
         
         # 初始化 UI
         self.init_ui()
+        self.apply_language()
         
     def init_ui(self):
         """初始化使用者介面"""
@@ -107,49 +100,49 @@ class MainWindow(QMainWindow):
         
         # 影像標籤
         self.video_label = QLabel()
-        self.video_label.setMinimumSize(640, 480)
-        self.video_label.setMaximumSize(640, 480)
-        self.video_label.setScaledContents(True)
+        self.video_label.setMinimumSize(320, 240)
+        self.video_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.video_label.setScaledContents(False)
         self.video_label.setStyleSheet(VIDEO_LABEL_STYLE)
         self.video_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.video_label.setText("等待開始...")
+        self.video_label.setText(core_config.t("waiting"))
         left_layout.addWidget(self.video_label)
         
         # 控制按鈕
         button_layout = QHBoxLayout()
         
-        self.start_button = QPushButton("開始")
+        self.start_button = QPushButton(core_config.t("start"))
         self.start_button.clicked.connect(self.start_detection)
         self.start_button.setStyleSheet(START_BUTTON_STYLE)
         button_layout.addWidget(self.start_button)
         
-        self.stop_button = QPushButton("停止")
+        self.stop_button = QPushButton(core_config.t("stop"))
         self.stop_button.clicked.connect(self.stop_detection)
         self.stop_button.setEnabled(False)
         self.stop_button.setStyleSheet(STOP_BUTTON_STYLE)
         button_layout.addWidget(self.stop_button)
         
-        self.pause_button = QPushButton("暫停")
+        self.pause_button = QPushButton(core_config.t("pause"))
         self.pause_button.clicked.connect(self.toggle_pause)
         self.pause_button.setEnabled(False)
         self.pause_button.setStyleSheet(PAUSE_BUTTON_STYLE)
         button_layout.addWidget(self.pause_button)
         
-        self.save_button = QPushButton("💾 保存")
+        self.save_button = QPushButton(core_config.t("save"))
         self.save_button.clicked.connect(self.save_snapshot)
         self.save_button.setEnabled(False)
-        self.save_button.setToolTip("保存當前畫面和分數")
+        self.save_button.setToolTip(core_config.t("save_tooltip"))
         self.save_button.setStyleSheet(SAVE_BUTTON_STYLE)
         button_layout.addWidget(self.save_button)
         
-        self.fps_label = QLabel("FPS: 0.0")
+        self.fps_label = QLabel(f"{core_config.t('fps')}: 0.0")
         self.fps_label.setStyleSheet(FPS_LABEL_STYLE)
         button_layout.addWidget(self.fps_label)
         
         # 參數設定按鈕（齒輪圖案）
         self.config_button = QPushButton("⚙")
         self.config_button.clicked.connect(self.show_config_dialog)
-        self.config_button.setToolTip("RULA 參數設定")
+        self.config_button.setToolTip(core_config.t("config_tooltip"))
         self.config_button.setStyleSheet(CONFIG_BUTTON_STYLE)
         button_layout.addWidget(self.config_button)
         
@@ -171,16 +164,16 @@ class MainWindow(QMainWindow):
         # 根據顯示模式創建不同的面板
         if self.display_mode == "RULA":
             # RULA 評估模式
-            self.left_group = ScorePanel("左側 RULA 評估")
+            self.left_group = ScorePanel(core_config.t("left_panel_title"))
             self.left_group.setMinimumHeight(280)
             right_layout.addWidget(self.left_group)
             
-            self.right_group = ScorePanel("右側 RULA 評估")
+            self.right_group = ScorePanel(core_config.t("right_panel_title"))
             self.right_group.setMinimumHeight(280)
             right_layout.addWidget(self.right_group)
         else:
             # 坐標顯示模式
-            self.coordinates_group = CoordinatesPanel("關鍵點坐標")
+            self.coordinates_group = CoordinatesPanel(core_config.t("coordinates_panel_title"))
             right_layout.addWidget(self.coordinates_group)
         
         right_layout.addStretch()
@@ -192,7 +185,7 @@ class MainWindow(QMainWindow):
         if self.camera_mode == "KINECT":
             # 使用 Azure Kinect（含 Body Tracking）
             if not KINECT_AVAILABLE:
-                self.on_error("Azure Kinect 不可用，請檢查 SDK 安裝")
+                self.on_error(core_config.t("kinect_not_available"))
                 return
             
             self.kinect_handler = KinectHandler()
@@ -202,7 +195,7 @@ class MainWindow(QMainWindow):
         elif self.camera_mode == "KINECT_RGB":
             # 使用 Kinect RGB 相機 + MediaPipe
             if not KINECT_RGB_AVAILABLE:
-                self.on_error("Kinect RGB 不可用，請檢查 SDK 安裝")
+                self.on_error(core_config.t("kinect_rgb_not_available"))
                 return
             
             self.kinect_rgb_handler = KinectRGBHandler()
@@ -218,7 +211,7 @@ class MainWindow(QMainWindow):
         
         # 重置暫停狀態和 FPS 計數器
         self.is_paused = False
-        self.pause_button.setText("暫停")
+        self.pause_button.setText(core_config.t("pause"))
         self.fps_counter = 0
         self.fps_timer = cv2.getTickCount()
         
@@ -266,14 +259,15 @@ class MainWindow(QMainWindow):
         self.prev_left = None
         self.prev_right = None
         self.is_paused = False
-        self.pause_button.setText("暫停")
+        self.pause_button.setText(core_config.t("pause"))
         
         # 重置 FPS 顯示
         self.current_fps = 0.0
-        self.fps_label.setText("FPS: 0.0")
+        self.fps_label.setText(f"{core_config.t('fps')}: 0.0")
         
         # 重置顯示
-        self.video_label.setText("已停止")
+        self.video_label.clear()
+        self.video_label.setText(core_config.t("stopped"))
         
         # 根據顯示模式重置面板
         if self.display_mode == "RULA":
@@ -421,18 +415,18 @@ class MainWindow(QMainWindow):
     def on_error(self, error_msg):
         """處理錯誤"""
         # 在視窗上顯示錯誤
-        self.video_label.setText(f"錯誤: {error_msg}")
+        self.video_label.setText(f"{core_config.t('error_prefix')}: {error_msg}")
         
         # 彈出錯誤對話框
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("錯誤")
+        msg_box.setWindowTitle(core_config.t("error_title"))
         
         # 設置主要文本
         if "Kinect" in error_msg or "連接" in error_msg:
-            msg_box.setText("Azure Kinect 連接失敗")
+            msg_box.setText(core_config.t("camera_connect_failed"))
         else:
-            msg_box.setText("發生錯誤")
+            msg_box.setText(core_config.t("generic_error"))
         
         # 設置詳細信息（不使用 DetailedText 避免出現細節按鈕）
         msg_box.setInformativeText(error_msg)
@@ -449,23 +443,23 @@ class MainWindow(QMainWindow):
     def on_fps_updated(self, fps):
         """更新 FPS 顯示"""
         self.current_fps = fps
-        self.fps_label.setText(f"FPS: {fps:.1f}")
+        self.fps_label.setText(f"{core_config.t('fps')}: {fps:.1f}")
     
     def toggle_pause(self):
         """切換暫停/繼續"""
         self.is_paused = not self.is_paused
         if self.is_paused:
-            self.pause_button.setText("繼續")
+            self.pause_button.setText(core_config.t("resume"))
         else:
-            self.pause_button.setText("暫停")
+            self.pause_button.setText(core_config.t("pause"))
     
     def save_snapshot(self):
         """保存當前畫面和分數"""
         if self.current_frame is None:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("警告")
-            msg_box.setText("沒有可保存的畫面")
+            msg_box.setWindowTitle(core_config.t("warning_title"))
+            msg_box.setText(core_config.t("no_frame_to_save"))
             msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
             msg_box.exec()
             return
@@ -487,8 +481,8 @@ class MainWindow(QMainWindow):
                 # 顯示成功訊息
                 msg_box = QMessageBox(self)
                 msg_box.setIcon(QMessageBox.Icon.Information)
-                msg_box.setWindowTitle("保存成功")
-                msg_box.setText("文件已成功保存！")
+                msg_box.setWindowTitle(core_config.t("save_success_title"))
+                msg_box.setText(core_config.t("save_success_text"))
                 msg_box.setInformativeText(message)
                 msg_box.setStyleSheet(SUCCESS_MESSAGEBOX_STYLE)
                 msg_box.exec()
@@ -496,8 +490,8 @@ class MainWindow(QMainWindow):
                 # 顯示錯誤訊息
                 msg_box = QMessageBox(self)
                 msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("錯誤")
-                msg_box.setText("保存失敗")
+                msg_box.setWindowTitle(core_config.t("error_title"))
+                msg_box.setText(core_config.t("save_failed"))
                 msg_box.setInformativeText(message)
                 msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
                 msg_box.exec()
@@ -505,8 +499,8 @@ class MainWindow(QMainWindow):
         except Exception as e:
             msg_box = QMessageBox(self)
             msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("錯誤")
-            msg_box.setText("保存失敗")
+            msg_box.setWindowTitle(core_config.t("error_title"))
+            msg_box.setText(core_config.t("save_failed"))
             msg_box.setInformativeText(str(e))
             msg_box.setStyleSheet(MESSAGEBOX_WIDE_STYLE)
             msg_box.exec()
@@ -515,6 +509,49 @@ class MainWindow(QMainWindow):
         """顯示參數設定對話框"""
         dialog = RULAConfigDialog(self)
         dialog.exec()
+
+    def apply_language(self):
+        """Apply current language setting to visible UI texts."""
+        self.setWindowTitle(f"{core_config.t('window_title')} - {self.get_source_type_text()}")
+
+        self.start_button.setText(core_config.t("start"))
+        self.stop_button.setText(core_config.t("stop"))
+        self.pause_button.setText(core_config.t("resume") if self.is_paused else core_config.t("pause"))
+        self.save_button.setText(core_config.t("save"))
+        self.save_button.setToolTip(core_config.t("save_tooltip"))
+        self.config_button.setToolTip(core_config.t("config_tooltip"))
+        self.fps_label.setText(f"{core_config.t('fps')}: {self.current_fps:.1f}")
+
+        if self.display_mode == "RULA":
+            self.left_group.setTitle(core_config.t("left_panel_title"))
+            self.right_group.setTitle(core_config.t("right_panel_title"))
+        else:
+            self.coordinates_group.setTitle(core_config.t("coordinates_panel_title"))
+
+        status_key_by_text = {
+            "等待開始...": "waiting",
+            "Waiting to start...": "waiting",
+            "已停止": "stopped",
+            "Stopped": "stopped",
+        }
+        current_status_key = status_key_by_text.get(self.video_label.text())
+        if current_status_key:
+            self.video_label.setText(core_config.t(current_status_key))
+
+    def get_source_type_text(self):
+        """Get localized camera source text."""
+        source_types = {
+            "WEBCAM": core_config.t("source_webcam"),
+            "KINECT": core_config.t("source_kinect"),
+            "KINECT_RGB": core_config.t("source_kinect_rgb"),
+        }
+        return source_types.get(self.camera_mode, core_config.t("source_webcam"))
+
+    def resizeEvent(self, event):
+        """Handle window resize and keep video display proportional."""
+        super().resizeEvent(event)
+        if self.current_frame is not None:
+            FrameRenderer.display_frame(self.video_label, self.current_frame)
     
     def closeEvent(self, event):
         """視窗關閉事件"""

@@ -251,6 +251,13 @@ class FrameRenderer:
         bytes_per_line = ch * w
         qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_image)
+        target_size = label.size()
+        if target_size.width() > 0 and target_size.height() > 0:
+            pixmap = pixmap.scaled(
+                target_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
         label.setPixmap(pixmap)
     
     @staticmethod
