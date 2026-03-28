@@ -17,7 +17,7 @@ from ..core import config as core_config
 
 from .styles import *
 from .components import ScorePanel, CoordinatesPanel, FrameRenderer, SnapshotManager, ChartGenerator
-from .dialogs import RULAConfigDialog, LanguageSelectionDialog
+from .dialogs import RULAConfigDialog
 from .language import language_manager, t
 
 
@@ -179,13 +179,6 @@ class MainWindow(QMainWindow):
         self.rula_freq_label.setToolTip(t('tooltip_rula_freq'))
         button_layout.addWidget(self.rula_freq_label, stretch=1)  # 允許標籤伸縮
         
-        # 語言切換按鈕
-        self.lang_button = QPushButton(t('btn_language'))
-        self.lang_button.clicked.connect(self.toggle_language)
-        self.lang_button.setToolTip(t('tooltip_language'))
-        self.lang_button.setStyleSheet(CONFIG_BUTTON_STYLE)
-        button_layout.addWidget(self.lang_button, stretch=1)  # 允許按鈕伸縮
-        
         # 參數設定按鈕（齒輪圖案）
         self.config_button = QPushButton("⚙")
         self.config_button.clicked.connect(self.show_config_dialog)
@@ -229,13 +222,6 @@ class MainWindow(QMainWindow):
         title = t('window_title_with_source').format(source_type)
         self.setWindowTitle(title)
     
-    def toggle_language(self):
-        """打开语言选择对话框"""
-        dialog = LanguageSelectionDialog(self)
-        if dialog.exec():
-            new_lang = dialog.get_selected_language()
-            self.lang.set_language(new_lang)
-    
     def on_language_changed(self, lang_code):
         """语言改变时更新所有UI文本"""
         # 更新窗口标题
@@ -261,8 +247,6 @@ class MainWindow(QMainWindow):
             self.record_button.setText(t('btn_record'))
         self.record_button.setToolTip(t('tooltip_record'))
         
-        self.lang_button.setText(t('btn_language'))
-        self.lang_button.setToolTip(t('tooltip_language'))
         self.config_button.setToolTip(t('tooltip_config'))
         
         # 更新 RULA 频率标签

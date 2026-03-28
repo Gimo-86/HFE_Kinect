@@ -281,14 +281,14 @@ class FrameRenderer:
         bytes_per_line = ch * w
         qt_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_image)
-        
-        # 縮放以適應標籤大小，同時保持寬高比
-        scaled_pixmap = pixmap.scaled(
-            label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation
-        )
-        label.setPixmap(scaled_pixmap)
+        target_size = label.size()
+        if target_size.width() > 0 and target_size.height() > 0:
+            pixmap = pixmap.scaled(
+                target_size,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+        label.setPixmap(pixmap)
     
     @staticmethod
     def draw_scores_on_frame(frame, left_score, right_score):

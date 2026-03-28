@@ -3,7 +3,7 @@ Dialog windows for RULA application
 """
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
-                             QGridLayout, QPushButton, QRadioButton, QButtonGroup)
+                             QGridLayout, QPushButton)
 from ..core import config
 from .styles import RULA_CONFIG_DIALOG_STYLE
 from .language import language_manager, t
@@ -32,6 +32,25 @@ class RULAConfigDialog(QDialog):
         self.title_label = QLabel(t('config_subtitle'))
         self.title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #3498db; margin-bottom: 10px;")
         layout.addWidget(self.title_label)
+
+        # 語言選擇（以參數視窗作為唯一切換入口）
+        language_layout = QHBoxLayout()
+        self.language_label = QLabel(t('config_language'))
+        self.language_label.setStyleSheet("font-weight: bold; color: #ecf0f1;")
+
+        self.language_combo = QComboBox()
+        self.language_codes = ['zh_TW', 'en']
+        for lang_code in self.language_codes:
+            self.language_combo.addItem(t('lang_chinese') if lang_code == 'zh_TW' else t('lang_english'), lang_code)
+
+        current_lang = self.lang.get_language()
+        current_lang_index = self.language_combo.findData(current_lang)
+        if current_lang_index >= 0:
+            self.language_combo.setCurrentIndex(current_lang_index)
+
+        language_layout.addWidget(self.language_label)
+        language_layout.addWidget(self.language_combo)
+        layout.addLayout(language_layout)
         
         # 參數網格
         grid_layout = QGridLayout()
@@ -120,8 +139,18 @@ class RULAConfigDialog(QDialog):
         """語言改變時更新對話框文本"""
         self.setWindowTitle(t('config_title'))
         self.title_label.setText(t('config_subtitle'))
+        self.language_label.setText(t('config_language'))
         self.save_button.setText(t('config_save'))
         self.close_button.setText(t('config_cancel'))
+
+        # 更新語言下拉選單顯示文字，保留目前選中的語言代碼
+        selected_lang = self.language_combo.currentData()
+        self.language_combo.clear()
+        for code in self.language_codes:
+            self.language_combo.addItem(t('lang_chinese') if code == 'zh_TW' else t('lang_english'), code)
+        selected_index = self.language_combo.findData(selected_lang)
+        if selected_index >= 0:
+            self.language_combo.setCurrentIndex(selected_index)
         
         # 更新參數名稱標籤
         for param_key, (label, name_key) in self.param_name_labels.items():
@@ -141,6 +170,8 @@ class RULAConfigDialog(QDialog):
     
     def save_config(self):
         """Save the current parameter values back to config"""
+        selected_lang = self.language_combo.currentData()
+
         for param_key, (combo, option_keys) in self.combos.items():
             # 獲取選中的索引
             index = combo.currentIndex()
@@ -153,77 +184,10 @@ class RULAConfigDialog(QDialog):
                 value = index
             
             config.RULA_CONFIG[param_key] = value
+
+        # 套用語言（會透過 observer 通知主視窗與各元件）
+        if selected_lang in ('en', 'zh_TW'):
+            self.lang.set_language(selected_lang)
         
         # Optionally show confirmation or just close
         self.accept()
-
-
-class LanguageSelectionDialog(QDialog):
-    """Language selection dialog"""
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.selected_language = language_manager.get_language()
-        
-        self.setWindowTitle(t('lang_dialog_title'))
-        self.setMinimumSize(400, 200)
-        self.setStyleSheet(RULA_CONFIG_DIALOG_STYLE)
-        
-        layout = QVBoxLayout()
-        layout.setSpacing(20)
-        layout.setContentsMargins(30, 30, 30, 30)
-        
-        # 标题
-        title_label = QLabel(t('lang_dialog_subtitle'))
-        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #3498db;")
-        layout.addWidget(title_label)
-        
-        # 语言选项
-        self.button_group = QButtonGroup(self)
-        
-        # 英文选项
-        self.en_radio = QRadioButton(t('lang_english'))
-        self.en_radio.setStyleSheet("font-size: 14px; color: #ecf0f1; padding: 10px;")
-        if self.selected_language == 'en':
-            self.en_radio.setChecked(True)
-        self.button_group.addButton(self.en_radio)
-        layout.addWidget(self.en_radio)
-        
-        # 繁体中文选项
-        self.zh_radio = QRadioButton(t('lang_chinese'))
-        self.zh_radio.setStyleSheet("font-size: 14px; color: #ecf0f1; padding: 10px;")
-        if self.selected_language == 'zh_TW':
-            self.zh_radio.setChecked(True)
-        self.button_group.addButton(self.zh_radio)
-        layout.addWidget(self.zh_radio)
-        
-        layout.addStretch()
-        
-        # 按钮布局
-        button_layout = QHBoxLayout()
-        button_layout.addStretch()
-        
-        # 确认按钮
-        confirm_button = QPushButton(t('lang_confirm'))
-        confirm_button.clicked.connect(self.confirm_selection)
-        button_layout.addWidget(confirm_button)
-        
-        # 取消按钮
-        cancel_button = QPushButton(t('lang_cancel'))
-        cancel_button.clicked.connect(self.reject)
-        button_layout.addWidget(cancel_button)
-        
-        layout.addLayout(button_layout)
-        self.setLayout(layout)
-    
-    def confirm_selection(self):
-        """确认语言选择"""
-        if self.en_radio.isChecked():
-            self.selected_language = 'en'
-        else:
-            self.selected_language = 'zh_TW'
-        self.accept()
-    
-    def get_selected_language(self):
-        """获取选择的语言"""
-        return self.selected_language    

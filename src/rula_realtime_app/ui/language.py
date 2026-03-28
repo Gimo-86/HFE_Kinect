@@ -92,11 +92,6 @@ TRANSLATIONS = {
         'en': '⏹ Stop',
         'zh_TW': '⏹ 停止'
     },
-    'btn_language': {
-        'en': '🌐',
-        'zh_TW': '🌐'
-    },
-    
     # 工具提示
     'tooltip_snapshot': {
         'en': 'Save current frame and scores',
@@ -110,11 +105,6 @@ TRANSLATIONS = {
         'en': 'RULA parameter settings',
         'zh_TW': 'RULA 參數設定'
     },
-    'tooltip_language': {
-        'en': 'Switch language / 切換語言',
-        'zh_TW': 'Switch language / 切換語言'
-    },
-    
     # 状态文本
     'status_waiting': {
         'en': 'Waiting to start...',
@@ -311,6 +301,10 @@ TRANSLATIONS = {
         'en': 'Adjust RULA fixed parameters:',
         'zh_TW': '調整 RULA 固定參數：'
     },
+    'config_language': {
+        'en': 'Language',
+        'zh_TW': '語言'
+    },
     'config_wrist_twist': {
         'en': 'Wrist Twist:',
         'zh_TW': '手腕扭轉 (wrist_twist):'
@@ -412,15 +406,6 @@ TRANSLATIONS = {
         'zh_TW': '關閉'
     },
     
-    # 语言选择对话框
-    'lang_dialog_title': {
-        'en': 'Language Selection',
-        'zh_TW': '語言選擇'
-    },
-    'lang_dialog_subtitle': {
-        'en': 'Select your preferred language:',
-        'zh_TW': '選擇您偏好的語言：'
-    },
     'lang_english': {
         'en': 'English',
         'zh_TW': 'English'
@@ -429,15 +414,6 @@ TRANSLATIONS = {
         'en': '繁體中文 (Traditional Chinese)',
         'zh_TW': '繁體中文 (Traditional Chinese)'
     },
-    'lang_confirm': {
-        'en': 'Confirm',
-        'zh_TW': '確認'
-    },
-    'lang_cancel': {
-        'en': 'Cancel',
-        'zh_TW': '取消'
-    },
-    
     # 倒计时
     'countdown': {
         'en': '{}',
