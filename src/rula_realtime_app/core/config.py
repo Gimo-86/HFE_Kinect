@@ -6,10 +6,10 @@ import os
 
 # === 數據源選擇 ===
 # 相機模式："WEBCAM" (普通攝像頭), "KINECT" (Kinect + Body Tracking), "KINECT_RGB" (Kinect RGB + MediaPipe)
-CAMERA_MODE = "KINECT"  # 可選: "WEBCAM", "KINECT", "KINECT_RGB"
+CAMERA_MODE = "WEBCAM"  # 預設: Webcam + MediaPipe；可選: "WEBCAM", "KINECT", "KINECT_RGB"
 
 # === 顯示模式選擇 ===
-DISPLAY_MODE = "COORDINATES"  # "RULA": 顯示RULA評估分數; "COORDINATES": 顯示關鍵點坐標
+DISPLAY_MODE = "RULA"  # 預設: "RULA"；可選: "RULA", "COORDINATES"
 
 # === 介面語言設定 ===
 APP_LANGUAGE = "zh-TW"  # 可選: "zh-TW", "en"
